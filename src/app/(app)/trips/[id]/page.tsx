@@ -6,6 +6,8 @@ import { secondaryButtonClass } from "@/components/ui";
 import { directionsUrl, formatTripDate } from "@/lib/trip-fields";
 import { setTripDone } from "../actions";
 import { Checklist } from "./checklist";
+import { Nearby } from "./nearby";
+import { loadNearby } from "./nearby-data";
 
 export default async function TripPage({
   params,
@@ -23,7 +25,7 @@ export default async function TripPage({
     .maybeSingle();
   if (!trip) notFound();
 
-  const [{ data: items }, { data: members }] = await Promise.all([
+  const [{ data: items }, { data: members }, nearby] = await Promise.all([
     supabase
       .from("checklist_items")
       .select("id, label, category, sort, checked, checked_by")
@@ -33,6 +35,7 @@ export default async function TripPage({
       .from("crew_members")
       .select("user_id, profiles(display_name)")
       .eq("crew_id", trip.crew_id),
+    activeTab === "nearby" ? loadNearby(supabase, trip.id) : null,
   ]);
 
   const names = Object.fromEntries(
@@ -124,9 +127,14 @@ export default async function TripPage({
       {activeTab === "checklist" ? (
         <Checklist tripId={trip.id} initialItems={items ?? []} names={names} />
       ) : (
-        <div className="border-forest/30 text-foreground/60 rounded-2xl border border-dashed p-8 text-center">
-          Nearby places and weather are coming soon.
-        </div>
+        <Nearby
+          tripId={trip.id}
+          hasPin={pin != null}
+          hasDate={trip.trip_date != null}
+          initialRecommendations={nearby?.recommendations ?? []}
+          weather={nearby?.weather ?? null}
+          lastRun={nearby?.lastRun ?? null}
+        />
       )}
     </div>
   );
