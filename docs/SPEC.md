@@ -37,7 +37,7 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 | Pipeline | Supabase Edge Function (`discover`) | Server-side API keys, runs on demand or on a schedule |
 | Scheduling | `pg_cron` + `pg_net` calling the Edge Function | Keeps everything inside Supabase |
 | Hosting | Vercel (frontend), Supabase (backend) | Both have free tiers |
-| Tests | Vitest (pure logic), Deno test (edge function), Playwright (1–2 smoke tests) | |
+| Tests | Deno test (discovery logic + edge function), Playwright (1–2 smoke tests); Vitest only if frontend logic needs it | |
 
 **Gotcha: magic links and PWAs.** On iOS, a magic link opens in Safari, not the installed PWA, so the session doesn't carry over. Use a 6-digit email OTP instead: put `{{ .Token }}` in the Supabase email template and call `verifyOtp` in the app.
 
@@ -197,7 +197,7 @@ score = category_weight
       × open_factor            # 1.0 open, 0.6 unknown, 0.1 closed on trip date
       × event_bonus            # 1.3 if it's an event on the trip date
 ```
-Each factor that fires adds a human-readable string to `reasons`. The pure scoring and normalization functions live in `/packages/core` (or `src/lib/discovery`) so Vitest and Deno test can both import them.
+Each factor that fires adds a human-readable string to `reasons`. Pure logic (normalization, dedupe, hours, scoring, refresh cadence) lives in `supabase/functions/_shared/discovery/`: plain TypeScript, no I/O, explicit `.ts` import extensions, tested with `deno test`. The Next.js app never imports it; it only calls the `discover` function.
 
 ---
 
@@ -233,7 +233,7 @@ Each phase ends in something deployed and usable.
 - [ ] Trips CRUD with a trailhead pin
 - [ ] Checklist templates and per-trip checklist (seed a "Day hike" template)
 - [ ] RLS on everything above, with a test that a non-member can't read a trip
-- [ ] "Nearby (live)": a quick server-side call to Overpass and Open-Meteo, not persisted
+- [ ] `discover` Edge Function, preview mode: fetch Overpass + Open-Meteo for a trip and return results directly (no tables yet). Phase 2 adds persistence to this same function instead of replacing it.
 
 **Done when:** both of us are in one crew, can see the same trip, and check items off on our phones.
 
