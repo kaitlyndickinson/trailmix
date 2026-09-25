@@ -108,8 +108,10 @@ export function TripForm({
         <input
           id="trail_url"
           name="trail_url"
-          type="url"
+          type="text"
           inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
           defaultValue={trip?.trail_url ?? ""}
           placeholder="https://www.alltrails.com/trail/…"
           className={inputClass}

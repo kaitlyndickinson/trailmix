@@ -100,7 +100,6 @@ export default async function TripPage({
         <form action={setTripDone}>
           <input type="hidden" name="id" value={trip.id} />
           <input type="hidden" name="done" value={String(!isDone)} />
-          <input type="hidden" name="trip_date" value={trip.trip_date ?? ""} />
           <button type="submit" className={secondaryButtonClass}>
             {isDone ? "Reopen" : "Mark done"}
           </button>

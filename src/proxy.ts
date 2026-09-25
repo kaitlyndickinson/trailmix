@@ -40,17 +40,25 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/login";
     url.search = "";
     url.searchParams.set("next", pathname + search);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
 
   if (signedIn && isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
 
   return response;
+}
+
+// Keep any cookies getClaims() refreshed; dropping them would lose a rotated
+// refresh token and sign the user out.
+function redirectWithCookies(url: URL, from: NextResponse) {
+  const redirect = NextResponse.redirect(url);
+  from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
 }
 
 export const config = {
