@@ -1,5 +1,23 @@
 import OpeningHours from "npm:opening_hours@3.15.0";
-import type { LatLng } from "./types.ts";
+import type { Category, LatLng } from "./types.ts";
+
+// Outdoor spots rarely list hours because they don't have any.
+const ALWAYS_ACCESSIBLE: ReadonlySet<Category> = new Set(["viewpoint", "historic"]);
+
+/**
+ * Hours to score a place by, or null when hours don't apply: no trip date,
+ * or an outdoor spot with no listed hours (so it isn't penalized as "unknown").
+ */
+export function hoursForPlace(
+  category: Category,
+  openingHours: string | null,
+  isoDate: string | null,
+  at: LatLng,
+): HoursResult | null {
+  if (!isoDate) return null;
+  if (!openingHours && ALWAYS_ACCESSIBLE.has(category)) return null;
+  return hoursOnDate(openingHours, isoDate, at);
+}
 
 export type HoursResult = {
   open: boolean | null; // null = unknown

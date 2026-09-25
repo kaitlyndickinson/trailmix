@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { hoursOnDate } from "./hours.ts";
+import { hoursForPlace, hoursOnDate } from "./hours.ts";
 
 const GOLDEN = { lat: 39.7555, lng: -105.2211 };
 const SATURDAY = "2026-09-26";
@@ -49,4 +49,18 @@ Deno.test("hoursOnDate: explicitly unknown ranges stay unknown", () => {
     open: null,
     reason: "Hours uncertain Sat",
   });
+});
+
+Deno.test("hoursForPlace: outdoor spots without hours aren't 'unknown'", () => {
+  assertEquals(hoursForPlace("viewpoint", null, SATURDAY, GOLDEN), null);
+  assertEquals(hoursForPlace("historic", null, SATURDAY, GOLDEN), null);
+  assertEquals(hoursForPlace("brewery", null, SATURDAY, GOLDEN), {
+    open: null,
+    reason: "Hours unknown",
+  });
+  // Listed hours still count, even outdoors.
+  assertEquals(hoursForPlace("museum", "Sa 10:00-16:00", SATURDAY, GOLDEN)?.open, true);
+  assertEquals(hoursForPlace("viewpoint", "Mo-Fr 08:00-17:00", SATURDAY, GOLDEN)?.open, false);
+  // No trip date: hours don't apply.
+  assertEquals(hoursForPlace("cafe", "Sa 10:00-16:00", null, GOLDEN), null);
 });
