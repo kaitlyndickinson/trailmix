@@ -274,6 +274,146 @@ export type Database = {
           },
         ]
       }
+      discovery_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          started_at: string
+          stats: Json
+          status: string
+          trigger: string
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          trigger: string
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+          trigger?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_runs_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          category: string | null
+          created_at: string
+          ends_at: string | null
+          fetched_at: string
+          id: string
+          lat: number | null
+          lng: number | null
+          name: string
+          source: string
+          source_id: string
+          starts_at: string
+          url: string | null
+          venue_name: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          ends_at?: string | null
+          fetched_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name: string
+          source: string
+          source_id: string
+          starts_at: string
+          url?: string | null
+          venue_name?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          ends_at?: string | null
+          fetched_at?: string
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          source?: string
+          source_id?: string
+          starts_at?: string
+          url?: string | null
+          venue_name?: string | null
+        }
+        Relationships: []
+      }
+      places: {
+        Row: {
+          category: string
+          created_at: string
+          fetched_at: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+          opening_hours: string | null
+          phone: string | null
+          source: string
+          source_id: string
+          tags: Json
+          website: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          lat: number
+          lng: number
+          name: string
+          opening_hours?: string | null
+          phone?: string | null
+          source: string
+          source_id: string
+          tags?: Json
+          website?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+          opening_hours?: string | null
+          phone?: string | null
+          source?: string
+          source_id?: string
+          tags?: Json
+          website?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -291,6 +431,84 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      source_fetches: {
+        Row: {
+          cache_key: string
+          fetched_at: string
+          item_count: number
+          source: string
+        }
+        Insert: {
+          cache_key: string
+          fetched_at?: string
+          item_count?: number
+          source: string
+        }
+        Update: {
+          cache_key?: string
+          fetched_at?: string
+          item_count?: number
+          source?: string
+        }
+        Relationships: []
+      }
+      trip_recommendations: {
+        Row: {
+          created_at: string
+          dismissed: boolean
+          distance_m: number | null
+          item_id: string
+          item_type: string
+          last_run_id: string | null
+          open_on_trip_date: boolean | null
+          pinned: boolean
+          reasons: Json
+          score: number
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed?: boolean
+          distance_m?: number | null
+          item_id: string
+          item_type: string
+          last_run_id?: string | null
+          open_on_trip_date?: boolean | null
+          pinned?: boolean
+          reasons?: Json
+          score: number
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          dismissed?: boolean
+          distance_m?: number | null
+          item_id?: string
+          item_type?: string
+          last_run_id?: string | null
+          open_on_trip_date?: boolean | null
+          pinned?: boolean
+          reasons?: Json
+          score?: number
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_recommendations_last_run_id_fkey"
+            columns: ["last_run_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_recommendations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trips: {
         Row: {
@@ -361,9 +579,94 @@ export type Database = {
           },
         ]
       }
+      weather_snapshots: {
+        Row: {
+          created_at: string
+          daily: Json
+          fetched_at: string
+          hourly: Json
+          id: string
+          run_id: string | null
+          summary: Json
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily: Json
+          fetched_at?: string
+          hourly: Json
+          id?: string
+          run_id?: string | null
+          summary?: Json
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          daily?: Json
+          fetched_at?: string
+          hourly?: Json
+          id?: string
+          run_id?: string | null
+          summary?: Json
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weather_snapshots_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      trip_recommendation_details: {
+        Row: {
+          category: string | null
+          dismissed: boolean | null
+          distance_m: number | null
+          item_id: string | null
+          item_type: string | null
+          last_run_id: string | null
+          lat: number | null
+          lng: number | null
+          name: string | null
+          open_on_trip_date: boolean | null
+          opening_hours: string | null
+          pinned: boolean | null
+          reasons: Json | null
+          score: number | null
+          starts_at: string | null
+          trip_id: string | null
+          url: string | null
+          venue_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_recommendations_last_run_id_fkey"
+            columns: ["last_run_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_recommendations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_checklist_template: {
