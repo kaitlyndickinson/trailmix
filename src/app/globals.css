@@ -1,26 +1,23 @@
 @import "tailwindcss";
 
+/* Light-only for now: high contrast reads best outdoors in sunlight. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f4ec;
+  --foreground: #1f2a22;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-forest: #2f5d3a;
+  --color-forest-dark: #234630;
+  --color-sand: #ebe4d3;
+  --color-sun: #f2c14e;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
