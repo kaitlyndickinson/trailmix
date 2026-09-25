@@ -134,13 +134,19 @@ weather_snapshots
   daily jsonb, hourly jsonb
   summary jsonb   -- derived: high/low, precip %, storm window, sunrise/sunset
 
-crew_preferences
+crew_preferences          -- Phase 4; until then scoring uses built-in default weights
   crew_id pk, category_weights jsonb   -- {"brewery": 1.5, "museum": 0.5, ...}
+
+source_fetches            -- Overpass cache bookkeeping; internal (RLS on, no client access)
+  source, cache_key, pk(source, cache_key)   -- cache_key = lat/lng rounded to 0.01° + radius
+  fetched_at, item_count
+
+trip_recommendation_details   -- view (security_invoker) joining recommendations to places/events for the Nearby tab
 ```
 
 ### RLS
 - Create a `security definer` helper `is_crew_member(crew_id uuid) returns bool`. This avoids recursive policies on `crew_members`.
-- `trips`, `checklist_*`, `trip_recommendations`, `weather_snapshots`, and `discovery_runs` are readable and writable when `is_crew_member(<the trip's crew_id>)`.
+- `trips` and `checklist_*` are readable and writable when `is_crew_member(<the trip's crew_id>)`. `trip_recommendations`, `weather_snapshots`, and `discovery_runs` are readable by members; only the Edge Function writes them, except that members can update `pinned` and `dismissed`.
 - `places` and `events` are readable by any authenticated user. Only the service role writes to them (from the Edge Function).
 - Invites are redeemed through an RPC, `redeem_crew_invite(code)`, that validates the code and inserts into `crew_members`. Codes are single-use and expire after 7 days. Redeeming also deletes the redeemer's own auto-created crew if it's untouched (no other members, no trips), so each person normally belongs to exactly one crew.
 - On signup, a trigger creates the user's `profiles` row and a default crew.
@@ -186,9 +192,9 @@ Weather is only fetched within the 16-day forecast window.
 3. **Normalize** each source into the common `places` / `events` shape, including category mapping.
 4. **Upsert** into `places` and `events` on `(source, source_id)`.
 5. **Dedupe** across sources: same normalized name (lowercase, stripped of "brewing co", "LLC", and similar) and within 75 m counts as one place.
-6. **Compute hours.** Evaluate `opening_hours` for the trip date with the `opening_hours` npm package (import via `npm:` in Deno). Record true, false, or null for unknown.
+6. **Compute hours.** Evaluate `opening_hours` for the trip date with the `opening_hours` npm package (import via `npm:` in Deno). Record true, false, or null for unknown. Viewpoints and historic sites with no listed hours are treated as always accessible (no hours factor, no "unknown" penalty).
 7. **Score** each candidate (see below) and keep the top N per category.
-8. **Write recommendations.** Upsert `trip_recommendations` while preserving `pinned` and `dismissed`. Remove unpinned rows that dropped out.
+8. **Write recommendations.** Upsert `trip_recommendations` while preserving `pinned` and `dismissed`. Remove rows that dropped out unless they are pinned or dismissed (so a dismissed place stays hidden if it comes back). Only prune item types whose source answered this run.
 9. **Derive a weather summary.** Include high and low, max precipitation chance, and a **storm window** (hours with precipitation probability ≥ 40% or thunderstorm weather codes). Flag "start early" if storms are likely after noon.
 10. **Finish.** Set run status and stats, `last_discovered_at`, and `next_refresh_at`.
 
@@ -224,7 +230,7 @@ Each phase ends in something deployed and usable.
 ### Phase 0: Setup (~30 min)
 - [x] Repo, Next.js scaffold, Tailwind, ESLint/Prettier
 - [x] Supabase project and local CLI (`supabase init`, `supabase link`)
-- [ ] Vercel project linked to the repo, env vars set
+- [x] Vercel project linked to the repo, env vars set
 - [x] PWA manifest and icon so it installs to the home screen
 
 **Done when:** a blank app is deployed and installable on my phone.
@@ -233,19 +239,19 @@ Each phase ends in something deployed and usable.
 - [x] Email + password auth (confirmation off), profiles trigger, default crew on signup
 - [x] Crew invite code and redeem RPC
 - [x] Trips CRUD with a trailhead pin
-- [ ] Checklist templates and per-trip checklist (seed a "Day hike" template) — per-trip checklist and seeded template done; template management screen pending
+- [x] Checklist templates and per-trip checklist (seed a "Day hike" template)
 - [x] RLS on everything above, with a test that a non-member can't read a trip
-- [ ] `discover` Edge Function, preview mode: fetch Overpass + Open-Meteo for a trip and return results directly (no tables yet). Phase 2 adds persistence to this same function instead of replacing it.
+- [x] ~~`discover` Edge Function, preview mode~~: skipped; the full Phase 2 function shipped instead.
 
 **Done when:** both of us are in one crew, can see the same trip, and check items off on our phones.
 
 ### Phase 2: Discovery pipeline v1
-- [ ] Discovery tables and migrations
-- [ ] `discover` Edge Function: fetch, normalize, upsert, dedupe, hours, score, write recommendations
-- [ ] Ticketmaster events
-- [ ] `discovery_runs` logging with partial-failure handling
-- [ ] Pin and dismiss that survive refreshes
-- [ ] Unit tests for normalization, dedupe, hours, and scoring
+- [x] Discovery tables and migrations
+- [x] `discover` Edge Function: fetch, normalize, upsert, dedupe, hours, score, write recommendations
+- [x] Ticketmaster events
+- [x] `discovery_runs` logging with partial-failure handling
+- [x] Pin and dismiss that survive refreshes
+- [x] Unit tests for normalization, dedupe, hours, and scoring
 
 **Done when:** the manual Refresh fills Nearby with ranked, explained results, and a failing source doesn't break the run.
 
