@@ -32,7 +32,7 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 | Frontend | Next.js (App Router, TypeScript), Tailwind | Familiar, deploys cleanly to Vercel |
 | PWA | Web app manifest + service worker (Serwist or next-pwa) | Home-screen install, basic offline shell |
 | Maps | Leaflet + react-leaflet with OSM tiles | Free, no API key |
-| Auth | Supabase Auth, **email OTP code** (not magic link) | See gotcha below |
+| Auth | Supabase Auth, **email + password** (email confirmation off) for now; **email OTP code** (not magic link) once custom SMTP is set up | See gotcha below |
 | DB | Supabase Postgres + Row-Level Security | Sharing is enforced in the database, not just the UI |
 | Pipeline | Supabase Edge Function (`discover`) | Server-side API keys, runs on demand or on a schedule |
 | Scheduling | `pg_cron` + `pg_net` calling the Edge Function | Keeps everything inside Supabase |
@@ -40,6 +40,8 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 | Tests | Deno test (discovery logic + edge function), Playwright (1–2 smoke tests); Vitest only if frontend logic needs it | |
 
 **Gotcha: magic links and PWAs.** On iOS, a magic link opens in Safari, not the installed PWA, so the session doesn't carry over. Use a 6-digit email OTP instead: put `{{ .Token }}` in the Supabase email template and call `verifyOtp` in the app.
+
+**Interim: password auth.** Supabase's built-in email sender is heavily rate-limited, so until custom SMTP is configured, sign-in is email + password with "Confirm email" disabled in the Supabase dashboard. No emails are sent. The switch to email OTP is tracked in Phase 4.
 
 **Gotcha: free-tier pausing.** Free Supabase projects pause after about a week of inactivity. The cron job doesn't count as activity. This is fine for now, but it's worth knowing.
 
@@ -140,7 +142,7 @@ crew_preferences
 - Create a `security definer` helper `is_crew_member(crew_id uuid) returns bool`. This avoids recursive policies on `crew_members`.
 - `trips`, `checklist_*`, `trip_recommendations`, `weather_snapshots`, and `discovery_runs` are readable and writable when `is_crew_member(<the trip's crew_id>)`.
 - `places` and `events` are readable by any authenticated user. Only the service role writes to them (from the Edge Function).
-- Invites are redeemed through an RPC, `redeem_crew_invite(code)`, that validates the code and inserts into `crew_members`.
+- Invites are redeemed through an RPC, `redeem_crew_invite(code)`, that validates the code and inserts into `crew_members`. Codes are single-use and expire after 7 days. Redeeming also deletes the redeemer's own auto-created crew if it's untouched (no other members, no trips), so each person normally belongs to exactly one crew.
 - On signup, a trigger creates the user's `profiles` row and a default crew.
 
 ---
@@ -203,7 +205,7 @@ Each factor that fires adds a human-readable string to `reasons`. Pure logic (no
 
 ## 6. Screens
 
-1. **Sign in:** enter email, then the 6-digit code.
+1. **Sign in:** email + password, with a sign-up form that also asks for a display name. (Later: enter email, then the 6-digit code.)
 2. **Trips:** list grouped into Upcoming, Someday, and Done. There's a big "+ Trip" button.
 3. **New/Edit trip:** name, AllTrails URL, trailhead pin (map tap or address search via Nominatim), and date. Choosing a template creates the checklist.
 4. **Trip detail**, with three tabs:
@@ -220,15 +222,15 @@ Each factor that fires adds a human-readable string to `reasons`. Pure logic (no
 Each phase ends in something deployed and usable.
 
 ### Phase 0: Setup (~30 min)
-- [ ] Repo, Next.js scaffold, Tailwind, ESLint/Prettier
-- [ ] Supabase project and local CLI (`supabase init`, `supabase link`)
+- [x] Repo, Next.js scaffold, Tailwind, ESLint/Prettier
+- [x] Supabase project and local CLI (`supabase init`, `supabase link`)
 - [ ] Vercel project linked to the repo, env vars set
 - [ ] PWA manifest and icon so it installs to the home screen
 
 **Done when:** a blank app is deployed and installable on my phone.
 
 ### Phase 1: Usable for tomorrow's hike
-- [ ] Email OTP auth, profiles trigger, default crew on signup
+- [ ] Email + password auth (confirmation off), profiles trigger, default crew on signup
 - [ ] Crew invite code and redeem RPC
 - [ ] Trips CRUD with a trailhead pin
 - [ ] Checklist templates and per-trip checklist (seed a "Day hike" template)
@@ -260,6 +262,7 @@ Each phase ends in something deployed and usable.
 - [ ] Map tab
 - [ ] "What changed since last refresh" (new event added, place now closed)
 - [ ] Offline-friendly checklist (cached shell, optimistic updates)
+- [ ] Custom SMTP, then switch auth to email OTP (`{{ .Token }}` template + `verifyOtp`)
 
 ### Phase 5: Portfolio-ready
 - [ ] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps
