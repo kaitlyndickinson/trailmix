@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
 import { getPrimaryCrew } from "@/lib/crew";
 import {
@@ -134,6 +135,21 @@ export default async function CrewPage({ searchParams }: PageProps<"/crew">) {
           </button>
         </form>
       </section>
+
+      <Link
+        href="/templates"
+        className={`${cardClass} active:bg-sand flex min-h-14 items-center justify-between`}
+      >
+        <span>
+          <span className="block font-semibold">Checklist templates</span>
+          <span className="text-foreground/60 text-sm">
+            Reusable lists new trips can start from
+          </span>
+        </span>
+        <span aria-hidden className="text-forest">
+          →
+        </span>
+      </Link>
 
       <section className={cardClass}>
         <h2 className="mb-3 font-semibold">Have a code?</h2>
