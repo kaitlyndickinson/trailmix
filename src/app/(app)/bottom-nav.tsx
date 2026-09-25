@@ -9,7 +9,11 @@ const TABS = [
     label: "Trips",
     match: (p: string) => p === "/" || p.startsWith("/trips"),
   },
-  { href: "/crew", label: "Crew", match: (p: string) => p.startsWith("/crew") },
+  {
+    href: "/crew",
+    label: "Crew",
+    match: (p: string) => p.startsWith("/crew") || p.startsWith("/templates"),
+  },
 ];
 
 export function BottomNav() {
