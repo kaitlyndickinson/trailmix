@@ -225,16 +225,16 @@ Each phase ends in something deployed and usable.
 - [x] Repo, Next.js scaffold, Tailwind, ESLint/Prettier
 - [x] Supabase project and local CLI (`supabase init`, `supabase link`)
 - [ ] Vercel project linked to the repo, env vars set
-- [ ] PWA manifest and icon so it installs to the home screen
+- [x] PWA manifest and icon so it installs to the home screen
 
 **Done when:** a blank app is deployed and installable on my phone.
 
 ### Phase 1: Usable for tomorrow's hike
-- [ ] Email + password auth (confirmation off), profiles trigger, default crew on signup
-- [ ] Crew invite code and redeem RPC
-- [ ] Trips CRUD with a trailhead pin
-- [ ] Checklist templates and per-trip checklist (seed a "Day hike" template)
-- [ ] RLS on everything above, with a test that a non-member can't read a trip
+- [x] Email + password auth (confirmation off), profiles trigger, default crew on signup
+- [x] Crew invite code and redeem RPC
+- [x] Trips CRUD with a trailhead pin
+- [ ] Checklist templates and per-trip checklist (seed a "Day hike" template) — per-trip checklist and seeded template done; template management screen pending
+- [x] RLS on everything above, with a test that a non-member can't read a trip
 - [ ] `discover` Edge Function, preview mode: fetch Overpass + Open-Meteo for a trip and return results directly (no tables yet). Phase 2 adds persistence to this same function instead of replacing it.
 
 **Done when:** both of us are in one crew, can see the same trip, and check items off on our phones.
