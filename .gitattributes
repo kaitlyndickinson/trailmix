@@ -1,0 +1,4 @@
+# Keep LF everywhere so Prettier and git agree on Windows.
+* text=auto eol=lf
+*.png binary
+*.ico binary
