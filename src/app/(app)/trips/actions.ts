@@ -8,6 +8,12 @@ import { normalizeUrl } from "@/lib/trip-fields";
 
 export type TripFormState = { error?: string };
 
+/** "done" sticks until reopened; otherwise a date makes a trip planned. */
+function deriveStatus(tripDate: string | null, done: boolean) {
+  if (done) return "done" as const;
+  return tripDate ? ("planned" as const) : ("someday" as const);
+}
+
 function readTripFields(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const tripDate = String(formData.get("trip_date") ?? "").trim() || null;
@@ -43,19 +49,22 @@ export async function createTrip(
     .insert({
       ...fields,
       crew_id: crew.id,
-      status: fields.trip_date ? "planned" : "someday",
+      status: deriveStatus(fields.trip_date, false),
     })
     .select("id")
     .single();
   if (error) return { error: error.message };
 
+  // The trip exists at this point, so always land on it. If the template
+  // didn't apply, the checklist is just empty and items can be added there;
+  // returning to the form would make a retry create a duplicate trip.
   const templateId = String(formData.get("template_id") ?? "");
   if (templateId) {
     const { error: templateError } = await supabase.rpc(
       "apply_checklist_template",
       { p_trip_id: trip.id, p_template_id: templateId },
     );
-    if (templateError) return { error: templateError.message };
+    if (templateError) console.error("apply_checklist_template", templateError);
   }
 
   revalidatePath("/");
@@ -78,12 +87,7 @@ export async function updateTrip(
     .single();
   if (readError) return { error: readError.message };
 
-  const status =
-    current.status === "done"
-      ? "done"
-      : fields.trip_date
-        ? "planned"
-        : "someday";
+  const status = deriveStatus(fields.trip_date, current.status === "done");
 
   const { error } = await supabase
     .from("trips")
@@ -109,8 +113,15 @@ export async function setTripDone(formData: FormData) {
   const { supabase } = await requireUser();
   const id = String(formData.get("id") ?? "");
   const done = formData.get("done") === "true";
-  const tripDate = String(formData.get("trip_date") ?? "");
-  const status = done ? "done" : tripDate ? "planned" : "someday";
+
+  // Read the date from the DB, not the (possibly stale) page.
+  const { data: trip, error: readError } = await supabase
+    .from("trips")
+    .select("trip_date")
+    .eq("id", id)
+    .single();
+  if (readError) throw new Error(readError.message);
+  const status = deriveStatus(trip.trip_date, done);
 
   const { error } = await supabase
     .from("trips")

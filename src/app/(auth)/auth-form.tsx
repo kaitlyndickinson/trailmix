@@ -84,7 +84,7 @@ export function AuthForm({
             New here?{" "}
             <Link
               href={`/signup${nextQuery}`}
-              className="text-forest font-medium underline"
+              className="text-forest inline-flex min-h-11 items-center px-1 font-medium underline"
             >
               Create an account
             </Link>
@@ -94,7 +94,7 @@ export function AuthForm({
             Already have an account?{" "}
             <Link
               href={`/login${nextQuery}`}
-              className="text-forest font-medium underline"
+              className="text-forest inline-flex min-h-11 items-center px-1 font-medium underline"
             >
               Sign in
             </Link>

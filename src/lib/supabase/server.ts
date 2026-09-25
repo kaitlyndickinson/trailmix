@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "./database.types";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 
 export async function createClient() {
@@ -29,11 +30,14 @@ export async function createClient() {
   );
 }
 
-/** Returns a server client and the verified user id, or redirects to /login. */
-export async function requireUser() {
+/**
+ * Returns a server client and the verified user id, or redirects to /login.
+ * Cached per request, so the layout and page share one auth check.
+ */
+export const requireUser = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
   if (!userId) redirect("/login");
   return { supabase, userId };
-}
+});

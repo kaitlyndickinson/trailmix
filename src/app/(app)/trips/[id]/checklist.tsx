@@ -31,20 +31,31 @@ export function Checklist({
   const [error, setError] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const pendingRefetch = useRef(false);
+  const fetchState = useRef<"idle" | "fetching" | "stale">("idle");
 
   // Live sync: any change from the other phone triggers a refetch.
   useEffect(() => {
+    // Read through a function: TS would otherwise narrow the ref across the
+    // await, but another event may have marked it stale in the meantime.
+    const wasMarkedStale = () => fetchState.current === "stale";
+
     async function refetch() {
-      if (pendingRefetch.current) return;
-      pendingRefetch.current = true;
-      const { data } = await supabase
-        .from("checklist_items")
-        .select(SELECT)
-        .eq("trip_id", tripId)
-        .order("sort");
-      pendingRefetch.current = false;
-      if (data) setItems(data);
+      // A change that lands mid-fetch may not be in that fetch's snapshot,
+      // so mark it stale and fetch once more when the current one finishes.
+      if (fetchState.current !== "idle") {
+        fetchState.current = "stale";
+        return;
+      }
+      do {
+        fetchState.current = "fetching";
+        const { data } = await supabase
+          .from("checklist_items")
+          .select(SELECT)
+          .eq("trip_id", tripId)
+          .order("sort");
+        if (data) setItems(data);
+      } while (wasMarkedStale());
+      fetchState.current = "idle";
     }
 
     const channel = supabase
@@ -52,12 +63,32 @@ export function Checklist({
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "checklist_items",
           filter: `trip_id=eq.${tripId}`,
         },
         () => void refetch(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "checklist_items",
+          filter: `trip_id=eq.${tripId}`,
+        },
+        () => void refetch(),
+      )
+      // Realtime can't filter DELETE events (and only sends the primary key),
+      // so listen to all deletes and drop the row if it's one of ours.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "checklist_items" },
+        (payload) => {
+          const id = (payload.old as { id?: string }).id;
+          if (id) setItems((cur) => cur.filter((i) => i.id !== id));
+        },
       )
       .subscribe();
 
