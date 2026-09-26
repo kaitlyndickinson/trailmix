@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconButton } from "@/components/icon-button";
 import { createClient } from "@/lib/supabase/client";
-import { inputClass, primaryButtonClass } from "@/components/ui";
+import {
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "@/components/ui";
 
 export type ChecklistItem = {
   id: string;
@@ -21,10 +25,12 @@ export function Checklist({
   tripId,
   initialItems,
   names,
+  templates,
 }: {
   tripId: string;
   initialItems: ChecklistItem[];
   names: Record<string, string>;
+  templates: { id: string; name: string }[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState(initialItems);
@@ -32,6 +38,7 @@ export function Checklist({
   const [error, setError] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [applying, setApplying] = useState(false);
   const fetchState = useRef<"idle" | "fetching" | "stale">("idle");
 
   // Live sync: any change from the other phone triggers a refetch.
@@ -208,6 +215,96 @@ export function Checklist({
     .map(([key]) => key)
     .filter((k) => k !== UNCATEGORIZED);
 
+  const addForm = (
+    <form
+      onSubmit={add}
+      className="bg-sand/60 flex flex-col gap-2 rounded-2xl p-3"
+    >
+      <input
+        value={newLabel}
+        onChange={(e) => setNewLabel(e.target.value)}
+        placeholder="Add an item…"
+        aria-label="New item"
+        maxLength={200}
+        className={inputClass}
+      />
+      <div className="flex gap-2">
+        <select
+          value={newCategory}
+          onChange={(e) => setNewCategory(e.target.value)}
+          aria-label="Category"
+          className={`${inputClass} flex-1`}
+        >
+          <option value="">{UNCATEGORIZED}</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className={primaryButtonClass}>
+          Add
+        </button>
+      </div>
+    </form>
+  );
+
+  async function applyTemplate(templateId: string) {
+    setError(null);
+    setApplying(true);
+    const { data, error } = await supabase
+      .rpc("apply_checklist_template", {
+        p_trip_id: tripId,
+        p_template_id: templateId,
+      })
+      .select(SELECT);
+    setApplying(false);
+    if (error) return setError(error.message);
+    setItems((cur) => {
+      const seen = new Set(cur.map((i) => i.id));
+      return [...cur, ...(data ?? []).filter((i) => !seen.has(i.id))];
+    });
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col gap-5">
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-red-50 p-3 text-sm text-red-800"
+          >
+            {error}
+          </p>
+        )}
+        <div className="border-forest/30 rounded-2xl border border-dashed p-5 text-center">
+          <p className="font-medium">No checklist for this trip</p>
+          {templates.length > 0 && (
+            <>
+              <p className="text-foreground/60 mt-1 text-sm">
+                Start from a template, or add items below.
+              </p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    disabled={applying}
+                    onClick={() => void applyTemplate(t.id)}
+                    className={secondaryButtonClass}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {addForm}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
@@ -246,12 +343,6 @@ export function Checklist({
           className="rounded-lg bg-red-50 p-3 text-sm text-red-800"
         >
           {error}
-        </p>
-      )}
-
-      {groups.length === 0 && (
-        <p className="text-foreground/60 text-center">
-          Nothing on the list yet. Add something below.
         </p>
       )}
 
@@ -319,37 +410,7 @@ export function Checklist({
         </section>
       ))}
 
-      <form
-        onSubmit={add}
-        className="bg-sand/60 flex flex-col gap-2 rounded-2xl p-3"
-      >
-        <input
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-          placeholder="Add an item…"
-          aria-label="New item"
-          maxLength={200}
-          className={inputClass}
-        />
-        <div className="flex gap-2">
-          <select
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            aria-label="Category"
-            className={`${inputClass} flex-1`}
-          >
-            <option value="">{UNCATEGORIZED}</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className={primaryButtonClass}>
-            Add
-          </button>
-        </div>
-      </form>
+      {addForm}
     </div>
   );
 }
