@@ -51,10 +51,11 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 
 | Source | Used for | Key? | Notes |
 |---|---|---|---|
-| OpenStreetMap Overpass API | Breweries, restaurants, cafes, viewpoints, museums, historic sites | No | Be polite: 1 combined query per run, cache results, set a User-Agent |
+| OpenStreetMap Overpass API | Breweries, restaurants, cafes, viewpoints, museums, historic sites | No | Be polite: 1 combined query per run, cache results, set a User-Agent. overpass-api.de rejects the Supabase Edge runtime (it appends its own tag to the User-Agent → 406), so the function queries two community mirrors in parallel and takes the first answer |
 | Open-Meteo | Daily and hourly forecast | No | Forecast only goes about 16 days out. Hourly data matters for Colorado afternoon thunderstorms |
 | Ticketmaster Discovery API | Events on the trip date | Free key | Skews toward bigger venues and misses small brewery trivia nights. That's a known gap (see Open Questions) |
-| Nominatim (OSM) | Place name → coordinates, reverse geocode for the trailhead's town | No | 1 request/sec max, and it needs a User-Agent with contact info |
+| Nominatim (OSM) | Reverse geocode for the trailhead's town *(later)* | No | 1 request/sec max, needs a User-Agent with contact info. Also blocks the Edge runtime's User-Agent, so call it from the Next.js server |
+| Photon (komoot, OSM-based) | Trailhead search by name | No | Called from a Next.js server action on an explicit Search tap (no search-as-you-type) |
 | NPS API *(later)* | Park alerts and closures | Free key | Only relevant for NPS units |
 | Foursquare Places *(later, optional)* | Richer place data and popularity | Free tier | Only if OSM data proves too thin |
 | COTREX *(later, optional)* | Colorado trail geometry | No | For "on the way home" routing ideas |
@@ -175,19 +176,19 @@ Weather is only fetched within the 16-day forecast window.
 ### Steps inside `discover(trip_id)`
 1. **Load** the trip and create a `discovery_runs` row with status `running`.
 2. **Fetch in parallel** with `Promise.allSettled`. One source failing makes the run `partial`, not failed.
-   - **Overpass:** one combined query. Radius varies by category, because restaurants within 16 km of a metro trailhead can number in the thousands.
+   - **Overpass:** one combined query at the trip's radius for every group. (An earlier per-category radius, with food at half the radius, hid the nearest town from mountain trailheads such as Georgetown from Mt. Bierstadt. Dense metro areas stay cheap because hours are only evaluated for a shortlist of 20 per category.) The radius is chosen per trip on the Nearby tab: 5, 10, 15, or 25 mi.
      ```
      [out:json][timeout:25];
      (
-       nwr["craft"="brewery"](around:16000,{lat},{lng});
-       nwr["amenity"~"^(restaurant|cafe|pub|bar|ice_cream)$"](around:8000,{lat},{lng});
-       nwr["tourism"~"^(viewpoint|museum|attraction)$"](around:16000,{lat},{lng});
-       nwr["historic"]["name"](around:10000,{lat},{lng});
+       nwr["craft"="brewery"](around:{radius},{lat},{lng});
+       nwr["amenity"~"^(restaurant|cafe|pub|bar|biergarten|ice_cream)$"](around:{radius},{lat},{lng});
+       nwr["tourism"~"^(viewpoint|museum|attraction)$"](around:{radius},{lat},{lng});
+       nwr["historic"]["name"](around:{radius},{lat},{lng});
      );
      out center tags;
      ```
      Skip the fetch if this area was queried in the last 7 days. Store a cache key from rounded coordinates plus radius.
-   - **Ticketmaster:** events whose start falls within the trip date (local day, plus the evening) inside about 25 miles. Use `geoPoint` (a geohash); the older `latlong` param is deprecated.
+   - **Ticketmaster:** events whose start falls within the trip date (local day, plus the evening) inside the trip radius (at least 10 miles). Use `geoPoint` (a geohash); the older `latlong` param is deprecated.
    - **Open-Meteo:** daily and hourly data for the trip date with `timezone=auto`.
 3. **Normalize** each source into the common `places` / `events` shape, including category mapping.
 4. **Upsert** into `places` and `events` on `(source, source_id)`.
@@ -213,10 +214,10 @@ Each factor that fires adds a human-readable string to `reasons`. Pure logic (no
 
 1. **Sign in:** email + password, with a sign-up form that also asks for a display name. (Later: enter email, then the 6-digit code.)
 2. **Trips:** list grouped into Upcoming, Someday, and Done. There's a big "+ Trip" button.
-3. **New/Edit trip:** name, AllTrails URL, trailhead pin (map tap or address search via Nominatim), and date. Choosing a template creates the checklist.
+3. **New/Edit trip:** name, AllTrails URL, date, and trailhead pin: search by name (Photon), paste coordinates or a Google/Apple Maps link (share links are resolved server-side, Google hosts only), tap the map, or use the current location; "Open in Google Maps" checks the name there. The checklist is optional: "No checklist" by default, or start from a template.
 4. **Trip detail**, with three tabs:
-   - **Checklist:** checkboxes showing who checked each item, with add, reorder, and delete.
-   - **Nearby:** weather card at the top, then recommendations grouped by category. Each shows its reasons and pin/dismiss actions. "Updated 3h ago" and a Refresh button sit at the top.
+   - **Checklist:** checkboxes showing who checked each item, with add, reorder, and delete. A trip with no checklist offers its crew's templates.
+   - **Nearby:** weather card at the top, then recommendations grouped by category. Each shows its reasons and pin/dismiss actions. "Updated 3h ago", a Refresh button, and the search radius chips sit at the top; a failed source shows a notice with Retry.
    - **Map:** trailhead plus recommendation markers.
 5. **Crew:** members, an invite code or link, and category preference sliders.
 6. **Templates:** manage checklist templates.
@@ -271,10 +272,10 @@ Each phase ends in something deployed and usable.
 - [ ] Custom SMTP, then switch auth to email OTP (`{{ .Token }}` template + `verifyOtp`)
 
 ### Phase 5: Portfolio-ready
-- [ ] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps
+- [ ] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps (done except the screenshot)
 - [ ] `docs/decisions/` with short ADRs (OTP vs magic link, crews vs per-trip sharing, deterministic ranking, shared place cache)
 - [ ] GitHub Actions: lint, typecheck, Vitest, Deno test
-- [ ] Seed script and `.env.example`
+- [ ] Seed script and `.env.example` (`.env.example` done)
 
 ### Later / maybe
 - GPX upload to compute "on the way home" places along the drive
