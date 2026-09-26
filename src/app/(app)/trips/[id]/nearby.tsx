@@ -39,18 +39,19 @@ export type LastRun = {
   failed_sources: string[];
 };
 
-const CATEGORIES: { key: string; label: string; icon: string }[] = [
-  { key: "event", label: "Events that day", icon: "🎟️" },
-  { key: "brewery", label: "Breweries", icon: "🍺" },
-  { key: "viewpoint", label: "Viewpoints", icon: "🏔️" },
-  { key: "restaurant", label: "Food", icon: "🍽️" },
-  { key: "cafe", label: "Coffee", icon: "☕" },
-  { key: "ice_cream", label: "Ice cream", icon: "🍦" },
-  { key: "bar", label: "Bars", icon: "🍸" },
-  { key: "museum", label: "Museums", icon: "🏛️" },
-  { key: "historic", label: "Historic", icon: "🪨" },
-  { key: "other", label: "Other spots", icon: "📍" },
-];
+const CATEGORIES: { key: string; label: string; tag: string; icon: string }[] =
+  [
+    { key: "event", tag: "Event", label: "Events that day", icon: "🎟️" },
+    { key: "brewery", tag: "Brewery", label: "Breweries", icon: "🍺" },
+    { key: "viewpoint", tag: "Viewpoint", label: "Viewpoints", icon: "🏔️" },
+    { key: "restaurant", tag: "Food", label: "Food", icon: "🍽️" },
+    { key: "cafe", tag: "Coffee", label: "Coffee", icon: "☕" },
+    { key: "ice_cream", tag: "Ice cream", label: "Ice cream", icon: "🍦" },
+    { key: "bar", tag: "Bar", label: "Bars", icon: "🍸" },
+    { key: "museum", tag: "Museum", label: "Museums", icon: "🏛️" },
+    { key: "historic", tag: "Historic", label: "Historic", icon: "📜" },
+    { key: "other", tag: "Spot", label: "Other spots", icon: "📍" },
+  ];
 
 const METERS_PER_MILE = 1609.344;
 const RADIUS_MILES = [5, 10, 15, 25];
@@ -185,12 +186,24 @@ export function Nearby({
 
   const visible = recs.filter((r) => showDismissed || !r.dismissed);
   const dismissedCount = recs.filter((r) => r.dismissed).length;
-  const groups = CATEGORIES.map((c) => ({
-    ...c,
-    items: visible
-      .filter((r) => r.category === c.key)
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.score - a.score),
-  })).filter((g) => g.items.length > 0);
+  const byScore = (a: Recommendation, b: Recommendation) => b.score - a.score;
+  // Pinned items get their own section at the top, tagged with their category.
+  const groups = [
+    {
+      key: "pinned",
+      label: "Pinned",
+      icon: "📌",
+      showCategory: true,
+      items: visible.filter((r) => r.pinned).sort(byScore),
+    },
+    ...CATEGORIES.map((c) => ({
+      ...c,
+      showCategory: false,
+      items: visible
+        .filter((r) => !r.pinned && r.category === c.key)
+        .sort(byScore),
+    })),
+  ].filter((g) => g.items.length > 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -294,6 +307,9 @@ export function Nearby({
               <RecommendationCard
                 key={`${rec.item_type}:${rec.item_id}`}
                 rec={rec}
+                categoryTag={
+                  group.showCategory ? categoryTag(rec.category) : undefined
+                }
                 onPin={(v) => void setFlag(rec, "pinned", v)}
                 onDismiss={(v) => void setFlag(rec, "dismissed", v)}
               />
@@ -372,12 +388,19 @@ function formatClock(hhmm: string | null): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+function categoryTag(category: string): string {
+  const c = CATEGORIES.find((c) => c.key === category);
+  return c ? `${c.icon} ${c.tag}` : "📍 Spot";
+}
+
 function RecommendationCard({
   rec,
+  categoryTag,
   onPin,
   onDismiss,
 }: {
   rec: Recommendation;
+  categoryTag?: string;
   onPin: (value: boolean) => void;
   onDismiss: (value: boolean) => void;
 }) {
@@ -388,14 +411,12 @@ function RecommendationCard({
       } ${rec.dismissed ? "opacity-50" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-medium">
-          {rec.pinned && (
-            <span aria-label="Pinned" className="mr-1">
-              📌
-            </span>
-          )}
-          {rec.name}
-        </p>
+        <p className="font-medium">{rec.name}</p>
+        {categoryTag && (
+          <span className="text-foreground/60 shrink-0 text-xs">
+            {categoryTag}
+          </span>
+        )}
       </div>
       <ul className="mt-1.5 flex flex-wrap gap-1.5">
         {rec.reasons.map((reason) => (
