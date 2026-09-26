@@ -24,6 +24,7 @@ export type Recommendation = {
 };
 
 export type WeatherSummary = {
+  date: string;
   conditions: string | null;
   high_f: number | null;
   low_f: number | null;
@@ -51,6 +52,17 @@ const CATEGORIES: { key: string; label: string; icon: string }[] = [
   { key: "other", label: "Other spots", icon: "📍" },
 ];
 
+const METERS_PER_MILE = 1609.344;
+const RADIUS_MILES = [5, 10, 15, 25];
+
+/** The chip closest to a stored radius (the default 16 km reads as 10 mi). */
+function nearestMiles(radiusM: number): number {
+  const miles = radiusM / METERS_PER_MILE;
+  return RADIUS_MILES.reduce((best, m) =>
+    Math.abs(m - miles) < Math.abs(best - miles) ? m : best,
+  );
+}
+
 const SOURCE_LABELS: Record<string, string> = {
   overpass: "places",
   ticketmaster: "events",
@@ -61,6 +73,7 @@ export function Nearby({
   tripId,
   hasPin,
   hasDate,
+  radiusM,
   initialRecommendations,
   weather,
   lastRun,
@@ -68,6 +81,7 @@ export function Nearby({
   tripId: string;
   hasPin: boolean;
   hasDate: boolean;
+  radiusM: number;
   initialRecommendations: Recommendation[];
   weather: WeatherSummary | null;
   lastRun: LastRun | null;
@@ -79,6 +93,7 @@ export function Nearby({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDismissed, setShowDismissed] = useState(false);
+  const [miles, setMiles] = useState(() => nearestMiles(radiusM));
 
   // Keep local state in step when the server sends fresh results.
   const [seen, setSeen] = useState(initialRecommendations);
@@ -108,6 +123,23 @@ export function Nearby({
     }
     setRefreshing(false);
     router.refresh();
+  }
+
+  async function changeRadius(next: number) {
+    if (next === miles || refreshing) return;
+    const before = miles;
+    setMiles(next);
+    setError(null);
+    const { error } = await supabase
+      .from("trips")
+      .update({ discovery_radius_m: Math.round(next * METERS_PER_MILE) })
+      .eq("id", tripId);
+    if (error) {
+      setMiles(before);
+      setError(error.message);
+      return;
+    }
+    await refresh();
   }
 
   async function setFlag(
@@ -165,7 +197,7 @@ export function Nearby({
       <div className="flex items-center justify-between gap-3">
         <p className="text-foreground/60 text-sm">
           {refreshing
-            ? "Looking around…"
+            ? "Looking around… this can take up to a minute"
             : lastRun?.finished_at && now
               ? `Updated ${timeAgo(lastRun.finished_at, now)}`
               : lastRun
@@ -182,6 +214,33 @@ export function Nearby({
         </button>
       </div>
 
+      <div
+        role="radiogroup"
+        aria-label="Search within"
+        className="flex items-center gap-2"
+      >
+        <span className="text-foreground/60 shrink-0 text-sm">Within</span>
+        <div className="bg-sand grid flex-1 grid-cols-4 rounded-xl p-1">
+          {RADIUS_MILES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={miles === m}
+              disabled={refreshing}
+              onClick={() => void changeRadius(m)}
+              className={`min-h-11 rounded-lg text-sm font-medium disabled:opacity-60 ${
+                miles === m
+                  ? "text-forest bg-white shadow-sm"
+                  : "text-foreground/60"
+              }`}
+            >
+              {m} mi
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && (
         <p
           role="alert"
@@ -191,13 +250,25 @@ export function Nearby({
         </p>
       )}
       {lastRun && lastRun.failed_sources.length > 0 && !refreshing && (
-        <p className="bg-sun/20 rounded-lg p-3 text-sm">
-          Couldn&apos;t reach{" "}
-          {lastRun.failed_sources
-            .map((s) => SOURCE_LABELS[s] ?? s)
-            .join(" or ")}{" "}
-          last time, so some results may be older.
-        </p>
+        <div
+          role="status"
+          className="border-sun bg-sun/20 flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"
+        >
+          <p>
+            Couldn&apos;t load{" "}
+            {lastRun.failed_sources
+              .map((s) => SOURCE_LABELS[s] ?? s)
+              .join(" or ")}{" "}
+            last time, so this list may be incomplete.
+          </p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="text-forest min-h-11 shrink-0 px-2 font-medium"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       <WeatherCard weather={weather} hasDate={hasDate} />

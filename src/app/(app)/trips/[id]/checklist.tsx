@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IconButton } from "@/components/icon-button";
 import { createClient } from "@/lib/supabase/client";
 import { inputClass, primaryButtonClass } from "@/components/ui";
 
@@ -350,33 +351,5 @@ export function Checklist({
         </div>
       </form>
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  disabled,
-  danger,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex size-11 items-center justify-center text-lg disabled:opacity-25 ${
-        danger ? "text-red-700" : "text-foreground/60"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
