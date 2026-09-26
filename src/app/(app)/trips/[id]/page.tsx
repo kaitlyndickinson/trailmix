@@ -35,7 +35,9 @@ export default async function TripPage({
       .from("crew_members")
       .select("user_id, profiles(display_name)")
       .eq("crew_id", trip.crew_id),
-    activeTab === "nearby" ? loadNearby(supabase, trip.id) : null,
+    activeTab === "nearby"
+      ? loadNearby(supabase, trip.id, trip.trip_date)
+      : null,
   ]);
 
   const names = Object.fromEntries(
@@ -131,6 +133,7 @@ export default async function TripPage({
           tripId={trip.id}
           hasPin={pin != null}
           hasDate={trip.trip_date != null}
+          radiusM={trip.discovery_radius_m}
           initialRecommendations={nearby?.recommendations ?? []}
           weather={nearby?.weather ?? null}
           lastRun={nearby?.lastRun ?? null}

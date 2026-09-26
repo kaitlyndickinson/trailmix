@@ -8,6 +8,7 @@ type SourceStat = { status?: string };
 export async function loadNearby(
   supabase: SupabaseClient<Database>,
   tripId: string,
+  tripDate: string | null,
 ) {
   const [recsResult, weatherResult, runResult] = await Promise.all([
     supabase
@@ -58,7 +59,12 @@ export async function loadNearby(
 
   const summary = weatherResult.data?.summary as
     WeatherSummary | null | undefined;
-  const weather = summary && summary.high_f !== undefined ? summary : null;
+  // Only show a forecast for the trip's current date; an older snapshot may
+  // be for a date the trip has since moved away from.
+  const weather =
+    summary && summary.date === tripDate && summary.high_f !== undefined
+      ? summary
+      : null;
 
   const run = runResult.data;
   const stats = (run?.stats ?? {}) as Record<string, SourceStat>;
