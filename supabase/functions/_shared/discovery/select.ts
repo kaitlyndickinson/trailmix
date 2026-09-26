@@ -1,5 +1,11 @@
 export const TOP_PER_CATEGORY = 5;
 
+/**
+ * How many per category get the full (hours-aware) score. Hours only lower a
+ * score, so this is a close approximation of scoring everything.
+ */
+export const PRESELECT_PER_CATEGORY = 20;
+
 /** Highest score first, keeping at most `n` per category. Ties break by name. */
 export function topPerCategory<
   T extends { category: string; score: number; name: string },

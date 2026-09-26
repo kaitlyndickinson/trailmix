@@ -17,7 +17,10 @@ import {
   normalizeTicketmaster,
 } from "../_shared/discovery/normalize.ts";
 import { scoreEvent, scorePlace } from "../_shared/discovery/score.ts";
-import { topPerCategory } from "../_shared/discovery/select.ts";
+import {
+  PRESELECT_PER_CATEGORY,
+  topPerCategory,
+} from "../_shared/discovery/select.ts";
 import type { Category, EventInput, LatLng } from "../_shared/discovery/types.ts";
 import {
   daysUntil,
@@ -164,9 +167,12 @@ async function loadEvents(
   admin: SupabaseClient,
   apiKey: string,
   center: LatLng,
+  radiusM: number,
   tripDate: string,
 ): Promise<(EventInput & { id: string })[]> {
-  const events = normalizeTicketmaster(await fetchEvents(apiKey, center, tripDate))
+  const events = normalizeTicketmaster(
+    await fetchEvents(apiKey, center, radiusM, tripDate),
+  )
     .filter((e) => e.local_date === tripDate);
   if (events.length === 0) return [];
 
@@ -220,7 +226,7 @@ export async function runDiscovery(
     const [placesResult, eventsResult, weatherResult] = await Promise.allSettled([
       loadPlaces(admin, center, radiusM),
       tripDate && tmKey
-        ? timed(() => loadEvents(admin, tmKey, center, tripDate))
+        ? timed(() => loadEvents(admin, tmKey, center, radiusM, tripDate))
         : Promise.resolve(null),
       wantWeather ? timed(() => fetchForecast(center, tripDate!)) : Promise.resolve(null),
     ]);
@@ -253,13 +259,45 @@ export async function runDiscovery(
       stats.ticketmaster = { status: "ok", count: events.length, ms: eventsResult.value.ms };
     }
 
-    // 5–7. Dedupe, hours, score, keep top N per category.
+    // Dismissed items keep their rows but shouldn't hold a top-N slot.
+    const { data: dismissedRows, error: dismissedError } = await admin
+      .from("trip_recommendations")
+      .select("item_type, item_id")
+      .eq("trip_id", trip.id)
+      .eq("dismissed", true);
+    if (dismissedError) throw new Error(`dismissed select: ${dismissedError.message}`);
+    const dismissed = new Set(
+      (dismissedRows ?? []).map((r: { item_type: string; item_id: string }) =>
+        `${r.item_type}:${r.item_id}`
+      ),
+    );
+
+    // 5–7. Dedupe, hours, score, keep top N per category. Candidates use the
+    // same radius as the Overpass query, so the result doesn't depend on what
+    // other trips have cached nearby.
     const inRadius = places
       .map((p) => ({ ...p, distance_m: haversineMeters(center, p) }))
       .filter((p) => p.distance_m <= radiusM);
     const { kept, collisions } = dedupePlaces(inRadius);
 
-    const placeCandidates = kept.map((p) => {
+    // Hours can only lower a score, so shortlist by the no-hours score before
+    // parsing opening_hours (keeps metro trailheads within the CPU budget).
+    const shortlist = topPerCategory(
+      kept
+        .filter((p) => !dismissed.has(`place:${p.id}`))
+        .map((p) => ({
+          ...p,
+          score: scorePlace({
+            category: p.category,
+            distanceM: p.distance_m,
+            radiusM,
+            hours: null,
+          }).score,
+        })),
+      PRESELECT_PER_CATEGORY,
+    );
+
+    const placeCandidates = shortlist.map((p) => {
       const hours = hoursForPlace(p.category, p.opening_hours, tripDate, p);
       const s = scorePlace({
         category: p.category,
@@ -279,7 +317,9 @@ export async function runDiscovery(
       };
     });
 
-    const eventCandidates = events.map((e) => {
+    const eventCandidates = events
+      .filter((e) => !dismissed.has(`event:${e.id}`))
+      .map((e) => {
       const distance = e.lat != null && e.lng != null
         ? haversineMeters(center, { lat: e.lat, lng: e.lng })
         : null;
@@ -326,7 +366,10 @@ export async function runDiscovery(
     // doesn't wipe the list.
     const prunable: string[] = [];
     if (!failures.includes("overpass")) prunable.push("place");
-    if ((stats.ticketmaster as SourceStat).status === "ok") prunable.push("event");
+    // With no trip date there are no hike-day events, so clear old ones too.
+    if (!tripDate || (stats.ticketmaster as SourceStat).status === "ok") {
+      prunable.push("event");
+    }
     if (prunable.length > 0) {
       const { error } = await admin
         .from("trip_recommendations")

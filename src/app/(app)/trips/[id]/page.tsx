@@ -25,18 +25,26 @@ export default async function TripPage({
     .maybeSingle();
   if (!trip) notFound();
 
-  const [{ data: items }, { data: members }, nearby] = await Promise.all([
-    supabase
-      .from("checklist_items")
-      .select("id, label, category, sort, checked, checked_by")
-      .eq("trip_id", trip.id)
-      .order("sort"),
-    supabase
-      .from("crew_members")
-      .select("user_id, profiles(display_name)")
-      .eq("crew_id", trip.crew_id),
-    activeTab === "nearby" ? loadNearby(supabase, trip.id) : null,
-  ]);
+  const [{ data: items }, { data: members }, { data: templates }, nearby] =
+    await Promise.all([
+      supabase
+        .from("checklist_items")
+        .select("id, label, category, sort, checked, checked_by")
+        .eq("trip_id", trip.id)
+        .order("sort"),
+      supabase
+        .from("crew_members")
+        .select("user_id, profiles(display_name)")
+        .eq("crew_id", trip.crew_id),
+      supabase
+        .from("checklist_templates")
+        .select("id, name")
+        .eq("crew_id", trip.crew_id)
+        .order("created_at"),
+      activeTab === "nearby"
+        ? loadNearby(supabase, trip.id, trip.trip_date)
+        : null,
+    ]);
 
   const names = Object.fromEntries(
     (members ?? []).map((m) => [m.user_id, m.profiles?.display_name ?? "?"]),
@@ -125,12 +133,18 @@ export default async function TripPage({
       </nav>
 
       {activeTab === "checklist" ? (
-        <Checklist tripId={trip.id} initialItems={items ?? []} names={names} />
+        <Checklist
+          tripId={trip.id}
+          initialItems={items ?? []}
+          names={names}
+          templates={templates ?? []}
+        />
       ) : (
         <Nearby
           tripId={trip.id}
           hasPin={pin != null}
           hasDate={trip.trip_date != null}
+          radiusM={trip.discovery_radius_m}
           initialRecommendations={nearby?.recommendations ?? []}
           weather={nearby?.weather ?? null}
           lastRun={nearby?.lastRun ?? null}

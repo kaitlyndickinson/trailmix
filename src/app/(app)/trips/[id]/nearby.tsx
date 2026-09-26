@@ -24,6 +24,7 @@ export type Recommendation = {
 };
 
 export type WeatherSummary = {
+  date: string;
   conditions: string | null;
   high_f: number | null;
   low_f: number | null;
@@ -38,18 +39,30 @@ export type LastRun = {
   failed_sources: string[];
 };
 
-const CATEGORIES: { key: string; label: string; icon: string }[] = [
-  { key: "event", label: "Events that day", icon: "🎟️" },
-  { key: "brewery", label: "Breweries", icon: "🍺" },
-  { key: "viewpoint", label: "Viewpoints", icon: "🏔️" },
-  { key: "restaurant", label: "Food", icon: "🍽️" },
-  { key: "cafe", label: "Coffee", icon: "☕" },
-  { key: "ice_cream", label: "Ice cream", icon: "🍦" },
-  { key: "bar", label: "Bars", icon: "🍸" },
-  { key: "museum", label: "Museums", icon: "🏛️" },
-  { key: "historic", label: "Historic", icon: "🪨" },
-  { key: "other", label: "Other spots", icon: "📍" },
-];
+const CATEGORIES: { key: string; label: string; tag: string; icon: string }[] =
+  [
+    { key: "event", tag: "Event", label: "Events that day", icon: "🎟️" },
+    { key: "brewery", tag: "Brewery", label: "Breweries", icon: "🍺" },
+    { key: "viewpoint", tag: "Viewpoint", label: "Viewpoints", icon: "🏔️" },
+    { key: "restaurant", tag: "Food", label: "Food", icon: "🍽️" },
+    { key: "cafe", tag: "Coffee", label: "Coffee", icon: "☕" },
+    { key: "ice_cream", tag: "Ice cream", label: "Ice cream", icon: "🍦" },
+    { key: "bar", tag: "Bar", label: "Bars", icon: "🍸" },
+    { key: "museum", tag: "Museum", label: "Museums", icon: "🏛️" },
+    { key: "historic", tag: "Historic", label: "Historic", icon: "📜" },
+    { key: "other", tag: "Spot", label: "Other spots", icon: "📍" },
+  ];
+
+const METERS_PER_MILE = 1609.344;
+const RADIUS_MILES = [5, 10, 15, 25];
+
+/** The chip closest to a stored radius (the default 16 km reads as 10 mi). */
+function nearestMiles(radiusM: number): number {
+  const miles = radiusM / METERS_PER_MILE;
+  return RADIUS_MILES.reduce((best, m) =>
+    Math.abs(m - miles) < Math.abs(best - miles) ? m : best,
+  );
+}
 
 const SOURCE_LABELS: Record<string, string> = {
   overpass: "places",
@@ -61,6 +74,7 @@ export function Nearby({
   tripId,
   hasPin,
   hasDate,
+  radiusM,
   initialRecommendations,
   weather,
   lastRun,
@@ -68,6 +82,7 @@ export function Nearby({
   tripId: string;
   hasPin: boolean;
   hasDate: boolean;
+  radiusM: number;
   initialRecommendations: Recommendation[];
   weather: WeatherSummary | null;
   lastRun: LastRun | null;
@@ -79,6 +94,7 @@ export function Nearby({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDismissed, setShowDismissed] = useState(false);
+  const [miles, setMiles] = useState(() => nearestMiles(radiusM));
 
   // Keep local state in step when the server sends fresh results.
   const [seen, setSeen] = useState(initialRecommendations);
@@ -108,6 +124,23 @@ export function Nearby({
     }
     setRefreshing(false);
     router.refresh();
+  }
+
+  async function changeRadius(next: number) {
+    if (next === miles || refreshing) return;
+    const before = miles;
+    setMiles(next);
+    setError(null);
+    const { error } = await supabase
+      .from("trips")
+      .update({ discovery_radius_m: Math.round(next * METERS_PER_MILE) })
+      .eq("id", tripId);
+    if (error) {
+      setMiles(before);
+      setError(error.message);
+      return;
+    }
+    await refresh();
   }
 
   async function setFlag(
@@ -153,19 +186,31 @@ export function Nearby({
 
   const visible = recs.filter((r) => showDismissed || !r.dismissed);
   const dismissedCount = recs.filter((r) => r.dismissed).length;
-  const groups = CATEGORIES.map((c) => ({
-    ...c,
-    items: visible
-      .filter((r) => r.category === c.key)
-      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.score - a.score),
-  })).filter((g) => g.items.length > 0);
+  const byScore = (a: Recommendation, b: Recommendation) => b.score - a.score;
+  // Pinned items get their own section at the top, tagged with their category.
+  const groups = [
+    {
+      key: "pinned",
+      label: "Pinned",
+      icon: "📌",
+      showCategory: true,
+      items: visible.filter((r) => r.pinned).sort(byScore),
+    },
+    ...CATEGORIES.map((c) => ({
+      ...c,
+      showCategory: false,
+      items: visible
+        .filter((r) => !r.pinned && r.category === c.key)
+        .sort(byScore),
+    })),
+  ].filter((g) => g.items.length > 0);
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-foreground/60 text-sm">
           {refreshing
-            ? "Looking around…"
+            ? "Looking around… this can take up to a minute"
             : lastRun?.finished_at && now
               ? `Updated ${timeAgo(lastRun.finished_at, now)}`
               : lastRun
@@ -182,6 +227,33 @@ export function Nearby({
         </button>
       </div>
 
+      <div
+        role="radiogroup"
+        aria-label="Search within"
+        className="flex items-center gap-2"
+      >
+        <span className="text-foreground/60 shrink-0 text-sm">Within</span>
+        <div className="bg-sand grid flex-1 grid-cols-4 rounded-xl p-1">
+          {RADIUS_MILES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={miles === m}
+              disabled={refreshing}
+              onClick={() => void changeRadius(m)}
+              className={`min-h-11 rounded-lg text-sm font-medium disabled:opacity-60 ${
+                miles === m
+                  ? "text-forest bg-white shadow-sm"
+                  : "text-foreground/60"
+              }`}
+            >
+              {m} mi
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && (
         <p
           role="alert"
@@ -191,13 +263,25 @@ export function Nearby({
         </p>
       )}
       {lastRun && lastRun.failed_sources.length > 0 && !refreshing && (
-        <p className="bg-sun/20 rounded-lg p-3 text-sm">
-          Couldn&apos;t reach{" "}
-          {lastRun.failed_sources
-            .map((s) => SOURCE_LABELS[s] ?? s)
-            .join(" or ")}{" "}
-          last time, so some results may be older.
-        </p>
+        <div
+          role="status"
+          className="border-sun bg-sun/20 flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"
+        >
+          <p>
+            Couldn&apos;t load{" "}
+            {lastRun.failed_sources
+              .map((s) => SOURCE_LABELS[s] ?? s)
+              .join(" or ")}{" "}
+            last time, so this list may be incomplete.
+          </p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="text-forest min-h-11 shrink-0 px-2 font-medium"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       <WeatherCard weather={weather} hasDate={hasDate} />
@@ -223,6 +307,9 @@ export function Nearby({
               <RecommendationCard
                 key={`${rec.item_type}:${rec.item_id}`}
                 rec={rec}
+                categoryTag={
+                  group.showCategory ? categoryTag(rec.category) : undefined
+                }
                 onPin={(v) => void setFlag(rec, "pinned", v)}
                 onDismiss={(v) => void setFlag(rec, "dismissed", v)}
               />
@@ -301,12 +388,19 @@ function formatClock(hhmm: string | null): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+function categoryTag(category: string): string {
+  const c = CATEGORIES.find((c) => c.key === category);
+  return c ? `${c.icon} ${c.tag}` : "📍 Spot";
+}
+
 function RecommendationCard({
   rec,
+  categoryTag,
   onPin,
   onDismiss,
 }: {
   rec: Recommendation;
+  categoryTag?: string;
   onPin: (value: boolean) => void;
   onDismiss: (value: boolean) => void;
 }) {
@@ -317,14 +411,12 @@ function RecommendationCard({
       } ${rec.dismissed ? "opacity-50" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-medium">
-          {rec.pinned && (
-            <span aria-label="Pinned" className="mr-1">
-              📌
-            </span>
-          )}
-          {rec.name}
-        </p>
+        <p className="font-medium">{rec.name}</p>
+        {categoryTag && (
+          <span className="text-foreground/60 shrink-0 text-xs">
+            {categoryTag}
+          </span>
+        )}
       </div>
       <ul className="mt-1.5 flex flex-wrap gap-1.5">
         {rec.reasons.map((reason) => (
