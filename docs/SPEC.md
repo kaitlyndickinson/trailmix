@@ -290,7 +290,7 @@ Each phase ends in something deployed and usable.
 - **Small local events.** Ticketmaster misses brewery trivia nights, markets, and similar. Options: PredictHQ (paid), specific venue calendars, or accept the gap. Eventbrite's public search API is gone.
 - **Drive time vs. straight-line distance.** Straight-line distance is fine for v1. OSRM could add real drive times later.
 - **Dedupe accuracy.** Name plus 75 m is a guess. Log collisions in `stats` and tune.
-- **Overpass reliability.** The public endpoint sometimes times out. Retry once with backoff, then fall back to cached places.
+- **Overpass reliability.** overpass-api.de rejects the Supabase Edge runtime (it appends its own User-Agent tag; 406), so the function races two community mirrors (private.coffee, mail.ru) and falls back to cached places if both fail. The mirrors can take 20–60 s. If they get unreliable, options are a self-hosted Overpass or moving the fetch to the Next.js server.
 
 ---
 
@@ -300,11 +300,12 @@ Each phase ends in something deployed and usable.
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=        # or publishable key, depending on project
+OSM_CONTACT_EMAIL=                    # server-only (no NEXT_PUBLIC_): User-Agent for trailhead search
 ```
 
 **Supabase secrets (Edge Functions)**, set with `supabase secrets set KEY=value`
 ```
 TICKETMASTER_API_KEY=
-OSM_CONTACT_EMAIL=                    # for Overpass/Nominatim User-Agent
+OSM_CONTACT_EMAIL=                    # User-Agent contact for Overpass mirrors
 ```
 The service role key is available to Edge Functions automatically. Never ship it to the client.
