@@ -217,7 +217,7 @@ Each factor that fires adds a human-readable string to `reasons`. Pure logic (no
 3. **New/Edit trip:** name, AllTrails URL, date, and trailhead pin: search by name (Photon), paste coordinates or a Google/Apple Maps link (share links are resolved server-side, Google hosts only), tap the map, or use the current location; "Open in Google Maps" checks the name there. The checklist is optional: "No checklist" by default, or start from a template.
 4. **Trip detail**, with three tabs:
    - **Checklist:** checkboxes showing who checked each item, with add, reorder, and delete. A trip with no checklist offers its crew's templates.
-   - **Nearby:** weather card at the top, then recommendations grouped by category. Each shows its reasons and pin/dismiss actions. "Updated 3h ago", a Refresh button, and the search radius chips sit at the top; a failed source shows a notice with Retry.
+   - **Nearby:** weather card at the top, then a **Pinned** section (pinned items from any category, tagged with their category), then recommendations grouped by category. Each shows its reasons and pin/dismiss actions. "Updated 3h ago", a Refresh button, and the search radius chips sit at the top; a failed source shows a notice with Retry.
    - **Map:** trailhead plus recommendation markers.
 5. **Crew:** members, an invite code or link, and category preference sliders.
 6. **Templates:** manage checklist templates.
