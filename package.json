@@ -10,7 +10,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "gen:types": "supabase gen types typescript --linked > src/lib/supabase/database.types.ts"
+    "gen:types": "supabase gen types typescript --linked > src/lib/supabase/database.types.ts",
+    "test": "vitest run",
+    "test:functions": "deno test supabase/functions"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -24,7 +26,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.22",
-    "@types/node": "^20",
+    "@types/node": "^24.19.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -33,6 +35,7 @@
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   }
 }

@@ -1,13 +1,3 @@
-/** Pulls "lat, lng" out of pasted text: plain coords or a Google/Apple Maps link. */
-export function parseCoords(text: string): { lat: number; lng: number } | null {
-  const match = text.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
-  if (!match) return null;
-  const lat = Number(match[1]);
-  const lng = Number(match[2]);
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-  return { lat, lng };
-}
-
 /** Accepts "alltrails.com/trail/..." as well as full URLs. Empty → null. */
 export function normalizeUrl(raw: string): string | null {
   const value = raw.trim();
