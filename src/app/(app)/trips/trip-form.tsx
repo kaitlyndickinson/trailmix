@@ -175,21 +175,25 @@ export function TripForm({
       {!editing && templates && templates.length > 0 && (
         <div>
           <label htmlFor="template_id" className={labelClass}>
-            Start checklist from
+            Checklist{" "}
+            <span className="text-foreground/50 font-normal">(optional)</span>
           </label>
           <select
             id="template_id"
             name="template_id"
-            defaultValue={templates[0].id}
+            defaultValue=""
             className={inputClass}
           >
+            <option value="">No checklist</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name}
+                Start from “{t.name}”
               </option>
             ))}
-            <option value="">Empty checklist</option>
           </select>
+          <p className="text-foreground/60 mt-1 text-sm">
+            You can add one later from the trip.
+          </p>
         </div>
       )}
 
