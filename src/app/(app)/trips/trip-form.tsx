@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { TrailheadMap, type LatLng } from "@/components/map";
+import type { LatLng } from "@/components/map";
 import {
   inputClass,
   labelClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from "@/components/ui";
-import { parseCoords } from "@/lib/trip-fields";
 import { createTrip, updateTrip, type TripFormState } from "./actions";
+import { TrailheadPicker } from "./trailhead-picker";
 
 export type TripFormValues = {
   id?: string;
@@ -39,32 +39,7 @@ export function TripForm({
       ? { lat: trip.trailhead_lat, lng: trip.trailhead_lng }
       : null,
   );
-  const [pasteError, setPasteError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
-
-  function handlePaste(text: string) {
-    if (!text.trim()) return setPasteError(null);
-    const coords = parseCoords(text);
-    if (coords) {
-      setPin(coords);
-      setPasteError(null);
-    } else {
-      setPasteError("Couldn't find coordinates. Try “39.64, -105.19”.");
-    }
-  }
-
-  function locateMe() {
-    if (!navigator.geolocation) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating(false);
-      },
-      () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  }
+  const [trailName, setTrailName] = useState(trip?.trail_name ?? "");
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
@@ -125,52 +100,18 @@ export function TripForm({
         <input
           id="trail_name"
           name="trail_name"
-          defaultValue={trip?.trail_name ?? ""}
+          value={trailName}
+          onChange={(e) => setTrailName(e.target.value)}
           placeholder="Castle Trail"
           className={inputClass}
         />
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={labelClass}>Trailhead</legend>
-        <p className="text-foreground/60 text-sm">
-          Tap the map, or paste coordinates or a Google Maps link.
-        </p>
-        <TrailheadMap value={pin} onChange={setPin} />
-        <input
-          aria-label="Paste coordinates"
-          placeholder="39.64, -105.19"
-          inputMode="decimal"
-          onBlur={(e) => handlePaste(e.currentTarget.value)}
-          onPaste={(e) => handlePaste(e.clipboardData.getData("text"))}
-          className={inputClass}
-        />
-        {pasteError && <p className="text-sm text-red-700">{pasteError}</p>}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={locateMe}
-            disabled={locating}
-            className={`${secondaryButtonClass} flex-1`}
-          >
-            {locating ? "Locating…" : "Use my location"}
-          </button>
-          {pin && (
-            <button
-              type="button"
-              onClick={() => setPin(null)}
-              className={secondaryButtonClass}
-            >
-              Clear pin
-            </button>
-          )}
-        </div>
-        {pin && (
-          <p className="text-foreground/50 font-mono text-xs">
-            {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
-          </p>
-        )}
-      </fieldset>
+      <TrailheadPicker
+        value={pin}
+        onChange={setPin}
+        suggestedQuery={trailName}
+      />
 
       {!editing && templates && templates.length > 0 && (
         <div>
