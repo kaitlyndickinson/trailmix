@@ -64,3 +64,14 @@ Deno.test("hoursForPlace: outdoor spots without hours aren't 'unknown'", () => {
   // No trip date: hours don't apply.
   assertEquals(hoursForPlace("cafe", "Sa 10:00-16:00", null, GOLDEN), null);
 });
+
+Deno.test("hoursOnDate: sun-relative hours are described, not given clock times", () => {
+  assertEquals(hoursOnDate("sunrise-sunset", SATURDAY, GOLDEN), {
+    open: true,
+    reason: "Open daylight hours Sat",
+  });
+  assertEquals(hoursOnDate("Mo-Fr sunrise-sunset", SATURDAY, GOLDEN), {
+    open: false,
+    reason: "Closed Sat",
+  });
+});

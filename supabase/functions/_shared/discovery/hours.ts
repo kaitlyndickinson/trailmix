@@ -26,6 +26,10 @@ export type HoursResult = {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Sun-relative rules resolve to real instants, not wall-clock times, so their
+// clock times would be off by the runtime's UTC offset. Describe them instead.
+const SUN_RELATIVE = /\b(sunrise|sunset|dawn|dusk)\b/i;
+
 function hhmm(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
@@ -52,8 +56,10 @@ export function hoursOnDate(
   let intervals: [Date, Date, boolean, string | undefined][];
   try {
     const oh = new OpeningHours(openingHours, {
-      lat: at.lat,
-      lon: at.lng,
+      // Strings, as in a Nominatim response; the library ignores numbers
+      // for sun calculations.
+      lat: String(at.lat) as unknown as number,
+      lon: String(at.lng) as unknown as number,
       address: { country_code: "us", state: "" },
     });
     intervals = oh.getOpenIntervals(dayStart, dayEnd) as typeof intervals;
@@ -64,6 +70,10 @@ export function hoursOnDate(
   if (intervals.length === 0) return { open: false, reason: `Closed ${weekday}` };
   if (intervals.every(([, , unknown]) => unknown)) {
     return { open: null, reason: `Hours uncertain ${weekday}` };
+  }
+
+  if (SUN_RELATIVE.test(openingHours)) {
+    return { open: true, reason: `Open daylight hours ${weekday}` };
   }
 
   const first = intervals[0][0];
