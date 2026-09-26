@@ -1,26 +1,22 @@
 import type { LatLng } from "./types.ts";
 
-/** Radius per group at the default 16 km, scaled to the trip's radius. */
-const BASE_RADIUS_M = 16_000;
-const GROUP_RADIUS_M = {
-  brewery: 16_000,
-  food: 8_000, // restaurants within 16 km of a metro trailhead can number in the thousands
-  sights: 16_000,
-  historic: 10_000,
-};
-
-/** The single combined Overpass query from the spec. */
+/**
+ * The single combined Overpass query. Every group uses the trip's full
+ * radius: mountain trailheads are often 10–20 km from the nearest town, and a
+ * smaller food radius hid places like Georgetown from Mt. Bierstadt. The
+ * pipeline filters candidates with the same radius, so results don't depend
+ * on what other trips have cached nearby, and it only evaluates hours for a
+ * shortlist, which keeps dense metro areas cheap.
+ */
 export function buildOverpassQuery(center: LatLng, radiusM: number): string {
-  const scale = radiusM / BASE_RADIUS_M;
-  const r = (base: number) => Math.round(base * scale);
-  const at = `${center.lat},${center.lng}`;
+  const around = `(around:${Math.round(radiusM)},${center.lat},${center.lng})`;
 
   return `[out:json][timeout:25];
 (
-  nwr["craft"="brewery"](around:${r(GROUP_RADIUS_M.brewery)},${at});
-  nwr["amenity"~"^(restaurant|cafe|pub|bar|biergarten|ice_cream)$"](around:${r(GROUP_RADIUS_M.food)},${at});
-  nwr["tourism"~"^(viewpoint|museum|attraction)$"](around:${r(GROUP_RADIUS_M.sights)},${at});
-  nwr["historic"]["name"](around:${r(GROUP_RADIUS_M.historic)},${at});
+  nwr["craft"="brewery"]${around};
+  nwr["amenity"~"^(restaurant|cafe|pub|bar|biergarten|ice_cream)$"]${around};
+  nwr["tourism"~"^(viewpoint|museum|attraction)$"]${around};
+  nwr["historic"]["name"]${around};
 );
 out center tags;`;
 }
