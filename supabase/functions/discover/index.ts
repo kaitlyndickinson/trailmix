@@ -13,6 +13,17 @@ const RUN_COOLDOWN_MS = 60_000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    return await handle(req);
+  } catch (err) {
+    // Anything unexpected still gets a JSON body with CORS headers, so the
+    // app can show a real message instead of a generic network error.
+    console.error("discover failed", err);
+    return json({ error: "Something went wrong looking around. Try again." }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -65,4 +76,4 @@ Deno.serve(async (req) => {
 
   const result = await runDiscovery(admin, trip as TripForDiscovery, "manual");
   return json(result, result.status === "error" ? 500 : 200);
-});
+}

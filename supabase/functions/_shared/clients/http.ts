@@ -26,24 +26,34 @@ function isRetryable(status: number): boolean {
 export async function fetchJson(
   source: string,
   url: string,
-  init: RequestInit & { timeoutMs?: number } = {},
+  init: RequestInit & { timeoutMs?: number; retry?: boolean } = {},
 ): Promise<unknown> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = init;
+  // retry: false lets a caller with fallbacks (Overpass mirrors) move on
+  // instead of waiting out a backoff on a server that just failed.
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, retry = true, ...rest } = init;
   const headers = new Headers(rest.headers);
   headers.set("User-Agent", userAgent());
   headers.set("Accept", "application/json");
 
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const attempts = retry ? 2 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
     try {
       const res = await fetch(url, {
         ...rest,
         headers,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: rest.signal
+          ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs)])
+          : AbortSignal.timeout(timeoutMs),
       });
       if (res.ok) return await res.json();
-      const body = (await res.text()).slice(0, 200);
+      // Error pages are often HTML; keep a short, readable excerpt for stats.
+      const body = (await res.text())
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 160);
       lastError = new HttpError(source, res.status, `HTTP ${res.status} ${body}`);
       if (!isRetryable(res.status)) break;
     } catch (err) {

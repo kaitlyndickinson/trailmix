@@ -27,6 +27,19 @@ const KEPT_TAGS = [
   "addr:city",
 ];
 
+/**
+ * OSM websites are free text: "https://x.com", "www.x.com", or junk.
+ * Returns an absolute http(s) URL, or null.
+ */
+export function normalizeWebsite(raw: string | undefined): string | null {
+  const value = raw?.trim().split(/[;\s]/)[0];
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return null; // other schemes (javascript:, mailto:, …)
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(value)) return `https://${value}`;
+  return null;
+}
+
 export function normalizeOverpass(json: unknown): PlaceInput[] {
   const elements = (json as { elements?: OverpassElement[] })?.elements ?? [];
   const places: PlaceInput[] = [];
@@ -51,7 +64,7 @@ export function normalizeOverpass(json: unknown): PlaceInput[] {
       category,
       lat,
       lng,
-      website: tags.website ?? tags["contact:website"] ?? null,
+      website: normalizeWebsite(tags.website ?? tags["contact:website"]),
       phone: tags.phone ?? tags["contact:phone"] ?? null,
       opening_hours: tags.opening_hours ?? null,
       tags: kept,

@@ -1,7 +1,11 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import { categorizeOsm } from "./categories.ts";
 import { buildOverpassQuery } from "./overpass-query.ts";
-import { normalizeOverpass, normalizeTicketmaster } from "./normalize.ts";
+import {
+  normalizeOverpass,
+  normalizeTicketmaster,
+  normalizeWebsite,
+} from "./normalize.ts";
 
 Deno.test("categorizeOsm: brewpub counts as a brewery", () => {
   assertEquals(categorizeOsm({ amenity: "pub", craft: "brewery" }), "brewery");
@@ -110,10 +114,20 @@ Deno.test("normalizeTicketmaster maps venue, local date/time, and genre", () => 
   assertEquals(events[1].starts_at, "2026-09-26T12:00:00Z");
 });
 
-Deno.test("buildOverpassQuery scales per-group radii with the trip radius", () => {
+Deno.test("buildOverpassQuery uses the trip radius for every group", () => {
   const q = buildOverpassQuery({ lat: 39.65, lng: -105.25 }, 8000);
-  assertEquals(q.includes('nwr["craft"="brewery"](around:8000,39.65,-105.25);'), true);
-  assertEquals(q.includes("(around:4000,39.65,-105.25)"), true); // food group
-  assertEquals(q.includes('nwr["historic"]["name"](around:5000,'), true);
   assertEquals(q.startsWith("[out:json][timeout:25];"), true);
+  assertEquals(q.match(/\(around:8000,39\.65,-105\.25\)/g)?.length, 4);
+  assertEquals(q.includes('nwr["craft"="brewery"](around:8000,39.65,-105.25);'), true);
+});
+
+Deno.test("normalizeWebsite: absolute http(s) only, scheme-less domains upgraded", () => {
+  assertEquals(normalizeWebsite("https://x.example/menu"), "https://x.example/menu");
+  assertEquals(normalizeWebsite("www.goldenbrewing.com"), "https://www.goldenbrewing.com");
+  assertEquals(normalizeWebsite("goldenbrewing.com/taproom"), "https://goldenbrewing.com/taproom");
+  assertEquals(normalizeWebsite("https://a.example;https://b.example"), "https://a.example");
+  assertEquals(normalizeWebsite("javascript:alert(1)"), null);
+  assertEquals(normalizeWebsite("mailto:hi@example.com"), null);
+  assertEquals(normalizeWebsite("call us"), null);
+  assertEquals(normalizeWebsite(undefined), null);
 });
