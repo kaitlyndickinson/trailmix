@@ -52,7 +52,8 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 | Source | Used for | Key? | Notes |
 |---|---|---|---|
 | OpenStreetMap Overpass API | Breweries, restaurants, cafes, viewpoints, museums, historic sites | No | Be polite: 1 combined query per run, cache results, set a User-Agent. overpass-api.de rejects the Supabase Edge runtime (it appends its own tag to the User-Agent → 406), so the function queries two community mirrors in parallel and takes the first answer |
-| Open-Meteo | Daily and hourly forecast | No | Forecast only goes about 16 days out. Hourly data matters for Colorado afternoon thunderstorms |
+| Open-Meteo | Daily and hourly forecast | No | Forecast only goes about 16 days out. Hourly data matters for Colorado afternoon thunderstorms. Requests feels-like, gusts, CAPE, UV, freezing level, visibility, and snow |
+| National Weather Service (api.weather.gov) | Active watches, warnings, and advisories at the trailhead | No | US only; needs a User-Agent with contact info. Accepts the Supabase Edge runtime. Best-effort: a failure never blocks the forecast |
 | Ticketmaster Discovery API | Events on the trip date | Free key | Skews toward bigger venues and misses small brewery trivia nights. That's a known gap (see Open Questions) |
 | Nominatim (OSM) | Reverse geocode for the trailhead's town *(later)* | No | 1 request/sec max, needs a User-Agent with contact info. Also blocks the Edge runtime's User-Agent, so call it from the Next.js server |
 | Photon (komoot, OSM-based) | Trailhead search by name | No | Called from a Next.js server action on an explicit Search tap (no search-as-you-type) |
@@ -158,10 +159,11 @@ trip_recommendation_details   -- view (security_invoker) joining recommendations
 
 ### Trigger paths
 1. **Manual.** A "Refresh" button on the trip page invokes `discover` with `{ trip_id }`. The function checks that the caller is a crew member.
-2. **Scheduled.** An hourly `pg_cron` job selects trips where `trip_date >= today and next_refresh_at <= now()` (limit 10). It calls `discover` through `pg_net.http_post` using a service key stored in Supabase Vault.
+2. **Weather only.** The forecast card's "Update" button invokes `discover` with `{ trip_id, mode: "weather" }`: forecast + NWS alerts only, about a second, no discovery run row. Opening a trip that's today or tomorrow with a forecast older than 3 hours triggers it automatically, once per visit. A forecast under 2 minutes old is returned as-is.
+3. **Scheduled** *(dropped for now; see Later)*. An hourly `pg_cron` job would select due trips and call `discover` through `pg_net`. Not built: trips are planned a few days out and checked when someone opens them, so on-demand freshness covers the need without a background job, a stored secret, extra load on the Overpass mirrors, or surprises when the free tier pauses.
 
-### Refresh cadence
-The pipeline sets `next_refresh_at` after each run, based on days until the trip:
+### Refresh cadence *(only relevant if the scheduler is built)*
+The pipeline would set `next_refresh_at` after each run, based on days until the trip:
 
 | Days out | Next refresh |
 |---|---|
@@ -196,7 +198,7 @@ Weather is only fetched within the 16-day forecast window.
 6. **Compute hours.** Evaluate `opening_hours` for the trip date with the `opening_hours` npm package (import via `npm:` in Deno). Record true, false, or null for unknown. Viewpoints and historic sites with no listed hours are treated as always accessible (no hours factor, no "unknown" penalty).
 7. **Score** each candidate (see below) and keep the top N per category.
 8. **Write recommendations.** Upsert `trip_recommendations` while preserving `pinned` and `dismissed`. Remove rows that dropped out unless they are pinned or dismissed (so a dismissed place stays hidden if it comes back). Only prune item types whose source answered this run.
-9. **Derive a weather summary.** Include high and low, max precipitation chance, and a **storm window** (hours with precipitation probability ≥ 40% or thunderstorm weather codes). Flag "start early" if storms are likely after noon.
+9. **Derive a weather summary** (`_shared/discovery/hiking-weather.ts`, pure). Daily high/low, feels-like range, precipitation and snow totals, max gusts, UV, sunrise/sunset, daylight, and the lowest freezing level. An **hourly strip** (5 AM–9 PM) with a risk per hour: *thunder* (thunderstorm codes, or CAPE ≥ 1000 J/kg with ≥ 30% precipitation chance) or *precip* (≥ 40% chance or a precipitation code). The **storm window** runs from the first to the last risky hour on the trail (5 AM–8 PM). **Start early** when thunderstorms begin at 11 AM or later, with a "be below treeline by" time one hour before. Plain-language **hiker flags**, most serious first: thunderstorms, rain/snow, new snow (≥ 0.1 in), visibility under 0.5 mi, gusts (25/35/50 mph), wind chill (32/20/0°F), heat (80/90°F), UV (6/8), and a freezing level below the forecast point's elevation. **NWS alerts** overlapping the hike day (trailhead-local), deduplicated, most severe first. Everything is stored in `weather_snapshots.summary`.
 10. **Finish.** Set run status and stats, `last_discovered_at`, and `next_refresh_at`.
 
 ### Scoring (v1, deterministic)
@@ -256,13 +258,16 @@ Each phase ends in something deployed and usable.
 
 **Done when:** the manual Refresh fills Nearby with ranked, explained results, and a failing source doesn't break the run.
 
-### Phase 3: Scheduled freshness
-- [ ] `pg_cron` hourly job, `pg_net` call, service key in Vault
-- [ ] Cadence logic for `next_refresh_at`
-- [ ] "Updated X ago", staleness indicator, run history view (small, for debugging)
-- [ ] Weather storm window and "start early" flag
+### Phase 3: On-demand freshness and hiker weather
+*Re-scoped from "Scheduled freshness": trips are usually planned a few days out, so freshness is on demand instead of on a timer (see Trigger paths).*
+- [x] Weather storm window and "start early" flag, plus hiker flags and an hourly strip
+- [x] National Weather Service alerts for the hike day
+- [x] Weather-only "Update" button; auto-update when opening a trip that's today/tomorrow with a forecast over 3 hours old
+- [x] Forecast heads-up badge in the Trips list and trip header
+- [x] "Updated X ago" for places and for the forecast
+- [ ] Run history view (small, for debugging)
 
-**Done when:** a trip two weeks out refreshes on its own and ramps up as the date approaches.
+**Done when:** opening tomorrow's hike shows a current forecast with storm timing, hiker flags, and any official alerts, with nothing running in the background.
 
 ### Phase 4: Ranking and polish
 - [ ] Crew category preferences feed into scoring
@@ -278,6 +283,8 @@ Each phase ends in something deployed and usable.
 - [ ] Seed script and `.env.example` (`.env.example` done)
 
 ### Later / maybe
+- Scheduled refresh: `pg_cron` + `pg_net` with a dedicated low-privilege secret (not the service key) and the cadence table above
+- Summit forecast: a second forecast point at the summit elevation when the pin is a trailhead
 - GPX upload to compute "on the way home" places along the drive
 - NPS alerts; fire bans and closures
 - LLM-written one-paragraph "day plan" built from the already-ranked results

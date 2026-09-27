@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import type { LastRun, Recommendation, WeatherSummary } from "./nearby";
+import { asWeatherSummary } from "@/lib/weather";
+import type { LastRun, Recommendation } from "./nearby";
 
 type SourceStat = { status?: string };
 
@@ -20,7 +21,7 @@ export async function loadNearby(
       .order("score", { ascending: false }),
     supabase
       .from("weather_snapshots")
-      .select("summary")
+      .select("summary, fetched_at")
       .eq("trip_id", tripId)
       .order("fetched_at", { ascending: false })
       .limit(1)
@@ -57,14 +58,12 @@ export async function loadNearby(
         : [],
   );
 
-  const summary = weatherResult.data?.summary as
-    WeatherSummary | null | undefined;
   // Only show a forecast for the trip's current date; an older snapshot may
   // be for a date the trip has since moved away from.
-  const weather =
-    summary && summary.date === tripDate && summary.high_f !== undefined
-      ? summary
-      : null;
+  const weather = asWeatherSummary(weatherResult.data?.summary, tripDate);
+  const weatherFetchedAt = weather
+    ? (weatherResult.data?.fetched_at ?? null)
+    : null;
 
   const run = runResult.data;
   const stats = (run?.stats ?? {}) as Record<string, SourceStat>;
@@ -78,5 +77,5 @@ export async function loadNearby(
       }
     : null;
 
-  return { recommendations, weather, lastRun };
+  return { recommendations, weather, weatherFetchedAt, lastRun };
 }

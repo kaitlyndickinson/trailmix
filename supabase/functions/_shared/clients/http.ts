@@ -33,7 +33,7 @@ export async function fetchJson(
   const { timeoutMs = DEFAULT_TIMEOUT_MS, retry = true, ...rest } = init;
   const headers = new Headers(rest.headers);
   headers.set("User-Agent", userAgent());
-  headers.set("Accept", "application/json");
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
 
   let lastError: unknown;
   const attempts = retry ? 2 : 1;

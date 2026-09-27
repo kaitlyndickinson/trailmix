@@ -8,7 +8,7 @@ import { hoursForPlace } from "../_shared/discovery/hours.ts";
 import { normalizeOverpass } from "../_shared/discovery/normalize.ts";
 import { scorePlace } from "../_shared/discovery/score.ts";
 import { topPerCategory } from "../_shared/discovery/select.ts";
-import { summarizeWeather } from "../_shared/discovery/weather.ts";
+import { buildDaySummary } from "../_shared/discovery/hiking-weather.ts";
 
 const [lat = "39.6364", lng = "-105.2094", date = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)] = Deno.args;
 const center = { lat: Number(lat), lng: Number(lng) };
@@ -24,5 +24,7 @@ const scored = kept.map((p) => {
   return { name: p.name, category: p.category, ...s };
 });
 console.log(`fetched in ${Date.now() - t0}ms: ${places.length} places in radius, ${collisions} dedupe collisions`);
-console.log("weather", date, JSON.stringify(summarizeWeather(meteo.daily ?? {}, date)), meteo.timezone);
+const day = buildDaySummary(meteo, date);
+console.log("weather", date, day && { conditions: day.conditions, high: day.high_f, low: day.low_f, storm_window: day.storm_window, start_early: day.start_early, elevation_ft: day.elevation_ft });
+for (const f of day?.flags ?? []) console.log(`  [${f.level}] ${f.text}`);
 for (const r of topPerCategory(scored, 2)) console.log(`${r.category.padEnd(10)} ${r.score.toFixed(2)}  ${r.name}  — ${r.reasons.join("; ")}`);

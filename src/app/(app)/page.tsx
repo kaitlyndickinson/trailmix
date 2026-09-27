@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
+import { loadWeatherBadges } from "@/lib/weather-badges";
 import { primaryButtonClass } from "@/components/ui";
 import { TripList } from "./trips/trip-list";
 
@@ -12,10 +13,14 @@ export default async function TripsPage() {
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
 
+  const upcoming = (trips ?? []).filter((t) => t.status !== "done");
+  const badges = await loadWeatherBadges(supabase, upcoming);
+
   const rows = (trips ?? []).map(({ checklist_items, ...t }) => ({
     ...t,
     total: checklist_items.length,
     checked: checklist_items.filter((i) => i.checked).length,
+    weather: badges.get(t.id) ?? null,
   }));
 
   return (
