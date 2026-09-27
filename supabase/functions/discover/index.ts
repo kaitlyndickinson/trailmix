@@ -1,4 +1,5 @@
-// POST { trip_id } → runs discovery for a trip the caller's crew owns.
+// POST { trip_id, mode? } → runs discovery for a trip the caller's crew owns.
+// mode "weather" only refreshes the forecast and alerts (about a second).
 // The caller's JWT is verified here (verify_jwt is off in config.toml), and
 // membership is checked by reading the trip with the caller's own RLS.
 // The service role is only used for writes to the shared cache and results.
@@ -7,9 +8,12 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/http-response.ts";
 import { supabaseEnv } from "../_shared/supabase-env.ts";
 import { runDiscovery, type TripForDiscovery } from "./pipeline.ts";
+import { refreshWeather, wantsWeather } from "./weather.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RUN_COOLDOWN_MS = 60_000;
+// A forecast this fresh is returned as-is instead of re-fetched.
+const WEATHER_FRESH_MS = 2 * 60_000;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -30,10 +34,14 @@ async function handle(req: Request): Promise<Response> {
   if (!token) return json({ error: "Sign in required" }, 401);
 
   let tripId: unknown;
+  let mode: unknown;
   try {
-    ({ trip_id: tripId } = await req.json());
+    ({ trip_id: tripId, mode } = await req.json());
   } catch {
-    return json({ error: "Body must be JSON: { trip_id }" }, 400);
+    return json({ error: "Body must be JSON: { trip_id, mode? }" }, 400);
+  }
+  if (mode !== undefined && mode !== "full" && mode !== "weather") {
+    return json({ error: 'mode must be "full" or "weather"' }, 400);
   }
   if (typeof tripId !== "string" || !UUID.test(tripId)) {
     return json({ error: "trip_id must be a UUID" }, 400);
@@ -65,6 +73,28 @@ async function handle(req: Request): Promise<Response> {
   const admin = createClient(env.url, env.serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  if (mode === "weather") {
+    if (!wantsWeather(trip.trip_date)) {
+      return json({ error: "Forecasts are available within 16 days of the trip date." }, 400);
+    }
+    const { data: latest } = await admin
+      .from("weather_snapshots")
+      .select("fetched_at")
+      .eq("trip_id", trip.id)
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest && Date.now() - Date.parse(latest.fetched_at) < WEATHER_FRESH_MS) {
+      return json({ status: "fresh" });
+    }
+    const center = { lat: trip.trailhead_lat, lng: trip.trailhead_lng };
+    const weather = await refreshWeather(admin, trip.id, null, center, trip.trip_date);
+    return json(
+      { status: weather.failed ? "error" : "ok", stats: weather.stats },
+      weather.failed ? 502 : 200,
+    );
+  }
 
   const { count } = await admin
     .from("discovery_runs")
