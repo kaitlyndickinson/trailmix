@@ -1,4 +1,4 @@
-# Trailmix: Spec & Roadmap
+# trailmix: Spec & Roadmap
 
 > Working name. Rename with find/replace if you pick something else.
 
@@ -12,7 +12,7 @@ AllTrails already handles finding trails and recording hikes, so this app doesn'
 
 **Goals**
 - Works well on a phone. It's a PWA I can install to the home screen.
-- Two people, one shared space. My fiancé and I see and edit the same trips and checklists.
+- One shared space per group (a crew). Everyone in it sees and edits the same trips and checklists.
 - Checklists for each trip, started from reusable templates (for example, "Day hike" or "Winter hike").
 - Date-aware discovery. Recommendations are pulled for the trip date and refreshed as the date gets closer.
 - Explainable recommendations. Every suggestion shows *why* it's there, such as "0.8 mi from trailhead", "open 11–9 Sat", or "event that evening".
@@ -69,7 +69,7 @@ AllTrails has no public API. A trip stores the AllTrails URL as a link, plus the
 All tables have `id uuid pk default gen_random_uuid()` and `created_at timestamptz default now()` unless noted.
 
 ### Sharing: crews
-A **crew** is a shared space ("Kaitlyn + fiancé"). Trips belong to a crew, so everything is shared automatically. There's no per-trip invite flow.
+A **crew** is a shared space ("Weekend hikers"). Trips belong to a crew, so everything is shared automatically. There's no per-trip invite flow.
 
 ```
 profiles            (id = auth.users.id, display_name, created_at)
@@ -234,7 +234,7 @@ Each phase ends in something deployed and usable.
 - [x] Vercel project linked to the repo, env vars set
 - [x] PWA manifest and icon so it installs to the home screen
 
-**Done when:** a blank app is deployed and installable on my phone.
+**Done when:** a blank app is deployed and installable on a phone.
 
 ### Phase 1: Usable for tomorrow's hike
 - [x] Email + password auth (confirmation off), profiles trigger, default crew on signup
@@ -244,7 +244,7 @@ Each phase ends in something deployed and usable.
 - [x] RLS on everything above, with a test that a non-member can't read a trip
 - [x] ~~`discover` Edge Function, preview mode~~: skipped; the full Phase 2 function shipped instead.
 
-**Done when:** both of us are in one crew, can see the same trip, and check items off on our phones.
+**Done when:** two people are in one crew, can see the same trip, and check items off on their phones.
 
 ### Phase 2: Discovery pipeline v1
 - [x] Discovery tables and migrations
@@ -272,7 +272,7 @@ Each phase ends in something deployed and usable.
 - [ ] Custom SMTP, then switch auth to email OTP (`{{ .Token }}` template + `verifyOtp`)
 
 ### Phase 5: Portfolio-ready
-- [x] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps
+- [x] README with a screenshot, a "why this exists" section, and setup steps (the Mermaid architecture diagram was dropped on purpose: it went stale as infra changed; "How it works" describes it in prose)
 - [ ] `docs/decisions/` with short ADRs (OTP vs magic link, crews vs per-trip sharing, deterministic ranking, shared place cache)
 - [ ] GitHub Actions: lint, typecheck, Vitest, Deno test
 - [ ] Seed script and `.env.example` (`.env.example` done)

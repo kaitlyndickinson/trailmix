@@ -16,7 +16,7 @@ export class HttpError extends Error {
 
 export function userAgent(): string {
   const contact = Deno.env.get("OSM_CONTACT_EMAIL") ?? "unset";
-  return `Trailmix/0.1 (hike planner; contact: ${contact})`;
+  return `trailmix/0.1 (hike planner; contact: ${contact})`;
 }
 
 function isRetryable(status: number): boolean {
