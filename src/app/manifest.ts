@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Trailmix",
-    short_name: "Trailmix",
+    name: "trailmix",
+    short_name: "trailmix",
     description: "Plan hikes together: trips, checklists, and what's nearby.",
     start_url: "/",
     display: "standalone",

@@ -3,7 +3,7 @@
 Read `docs/SPEC.md` before starting any task. It is the source of truth for the data model, pipeline, and roadmap. If something in the spec seems wrong or underspecified, stop and ask rather than improvising.
 
 ## Project
-Trailmix is a mobile-first PWA for planning hikes with a partner: shared trips, checklists, and date-aware discovery of nearby places, events, and weather.
+trailmix is a mobile-first PWA for planning hikes with a crew: shared trips, checklists, and date-aware discovery of nearby places, events, and weather.
 
 ## Stack
 - Next.js App Router, TypeScript (strict), Tailwind

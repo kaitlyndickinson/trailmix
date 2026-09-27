@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Trailmix",
+  title: "trailmix",
   description: "Plan hikes together: trips, checklists, and what's nearby.",
-  appleWebApp: { capable: true, title: "Trailmix", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "trailmix", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
