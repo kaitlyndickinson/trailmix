@@ -11,8 +11,8 @@ export function InviteShare({ code }: { code: string }) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Trailmix invite",
-          text: "Join my hiking crew on Trailmix",
+          title: "trailmix invite",
+          text: "Join my hiking crew on trailmix",
           url,
         });
         return;
