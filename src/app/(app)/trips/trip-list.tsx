@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
+import { WeatherBadge } from "@/components/weather-badge";
 import { formatTripDate, localToday } from "@/lib/trip-fields";
+import type { WeatherBadge as Badge } from "@/lib/weather";
 
 type TripRow = {
   id: string;
@@ -12,6 +14,7 @@ type TripRow = {
   status: string;
   total: number;
   checked: number;
+  weather: Badge | null;
 };
 
 // Grouped on the client so "today" is the viewer's local date, not the server's.
@@ -94,6 +97,11 @@ function Group({
                       ? formatTripDate(trip.trip_date)
                       : "No date yet")}
                 </p>
+                {trip.weather && !muted && (
+                  <div className="mt-1">
+                    <WeatherBadge badge={trip.weather} />
+                  </div>
+                )}
               </div>
               {trip.total > 0 && (
                 <span className="text-foreground/50 shrink-0 font-mono text-xs">

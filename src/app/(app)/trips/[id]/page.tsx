@@ -8,6 +8,8 @@ import { setTripDone } from "../actions";
 import { Checklist } from "./checklist";
 import { Nearby } from "./nearby";
 import { loadNearby } from "./nearby-data";
+import { WeatherBadge } from "@/components/weather-badge";
+import { loadWeatherBadges } from "@/lib/weather-badges";
 
 export default async function TripPage({
   params,
@@ -25,26 +27,32 @@ export default async function TripPage({
     .maybeSingle();
   if (!trip) notFound();
 
-  const [{ data: items }, { data: members }, { data: templates }, nearby] =
-    await Promise.all([
-      supabase
-        .from("checklist_items")
-        .select("id, label, category, sort, checked, checked_by")
-        .eq("trip_id", trip.id)
-        .order("sort"),
-      supabase
-        .from("crew_members")
-        .select("user_id, profiles(display_name)")
-        .eq("crew_id", trip.crew_id),
-      supabase
-        .from("checklist_templates")
-        .select("id, name")
-        .eq("crew_id", trip.crew_id)
-        .order("created_at"),
-      activeTab === "nearby"
-        ? loadNearby(supabase, trip.id, trip.trip_date)
-        : null,
-    ]);
+  const [
+    { data: items },
+    { data: members },
+    { data: templates },
+    nearby,
+    badges,
+  ] = await Promise.all([
+    supabase
+      .from("checklist_items")
+      .select("id, label, category, sort, checked, checked_by")
+      .eq("trip_id", trip.id)
+      .order("sort"),
+    supabase
+      .from("crew_members")
+      .select("user_id, profiles(display_name)")
+      .eq("crew_id", trip.crew_id),
+    supabase
+      .from("checklist_templates")
+      .select("id, name")
+      .eq("crew_id", trip.crew_id)
+      .order("created_at"),
+    activeTab === "nearby"
+      ? loadNearby(supabase, trip.id, trip.trip_date)
+      : null,
+    trip.status !== "done" ? loadWeatherBadges(supabase, [trip]) : null,
+  ]);
 
   const names = Object.fromEntries(
     (members ?? []).map((m) => [m.user_id, m.profiles?.display_name ?? "?"]),
@@ -75,6 +83,11 @@ export default async function TripPage({
                 : "Someday"}
               {trip.trail_name && <> · {trip.trail_name}</>}
             </p>
+            {badges?.get(trip.id) && (
+              <div className="mt-2">
+                <WeatherBadge badge={badges.get(trip.id)!} />
+              </div>
+            )}
           </div>
           <Link
             href={`/trips/${trip.id}/edit`}
@@ -143,10 +156,11 @@ export default async function TripPage({
         <Nearby
           tripId={trip.id}
           hasPin={pin != null}
-          hasDate={trip.trip_date != null}
+          tripDate={trip.trip_date}
           radiusM={trip.discovery_radius_m}
           initialRecommendations={nearby?.recommendations ?? []}
           weather={nearby?.weather ?? null}
+          weatherFetchedAt={nearby?.weatherFetchedAt ?? null}
           lastRun={nearby?.lastRun ?? null}
         />
       )}
