@@ -20,7 +20,8 @@ It deliberately doesn't do GPS tracking, trail search, or social features. Recom
 - **Crews:** a shared space for your hiking group, any size. Invite with a single-use code or link; trips and checklists are shared automatically.
 - **Trips:** trail name, AllTrails link, date (or "someday"), and a trailhead pin. Find the trailhead by name search, by pasting coordinates or a Google/Apple Maps link (share links included), by tapping the map, or with your current location.
 - **Checklists (optional):** start from a reusable template like "Day hike", or add items as you go. Check items off on any phone and it syncs live, showing who checked what.
-- **Nearby:** the day's forecast plus ranked places and events near the trailhead, grouped by category, within 5–25 mi. Pin favorites to the top, dismiss the rest; both stick across refreshes.
+- **Hiker weather:** an hourly forecast for the trailhead with the storm window and a "start early" call when afternoon thunderstorms are likely, plus plain-language flags for snow, whiteout visibility, wind, wind chill, heat, UV, and freezing level. Official National Weather Service watches and warnings for the hike day. Updates on demand, and automatically when you open a trip that's today or tomorrow.
+- **Nearby:** ranked places and events near the trailhead, grouped by category, within 5–25 mi. Pin favorites to the top, dismiss the rest; both stick across refreshes.
 - **Installable:** add it to your home screen as a PWA.
 
 ## How it works
@@ -94,4 +95,4 @@ docs/SPEC.md               spec and roadmap
 
 ## Data sources
 
-Place data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, via community Overpass mirrors and [Photon](https://photon.komoot.io). Weather by [Open-Meteo](https://open-meteo.com). Events from Ticketmaster. Map tiles © OpenStreetMap.
+Place data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, via community Overpass mirrors and [Photon](https://photon.komoot.io). Weather by [Open-Meteo](https://open-meteo.com); alerts from the [National Weather Service](https://www.weather.gov). Events from Ticketmaster. Map tiles © OpenStreetMap.
