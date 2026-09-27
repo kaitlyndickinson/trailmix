@@ -2,6 +2,13 @@
 
 A small, mobile-first web app for planning hikes with a partner. Save a trail, pick a date, share a checklist, and see what's open and happening near the trailhead that day: breweries, food, viewpoints, events, and the forecast.
 
+<p align="center">
+  <img src="docs/screenshots/trips.png" alt="Trips list grouped into Upcoming, Someday, and Done" width="250">
+  <img src="docs/screenshots/checklist.png" alt="Trip checklist showing the trailhead map and items checked by each person" width="250">
+  <img src="docs/screenshots/nearby.png" alt="Nearby tab with the forecast, pinned places, events, and breweries near Mt. Bierstadt" width="250">
+</p>
+<p align="center"><sub>Trips · shared checklist · what's nearby (sample trips and checklist; places are real OpenStreetMap results near Mt. Bierstadt)</sub></p>
+
 ## Why this exists
 
 AllTrails is great for finding trails and recording hikes. The annoying part is everything around it: finding the trail, then separately digging around for a brewery that's open after, an event in town that evening, and whether afternoon storms are coming. Trailmix does that second part and keeps a checklist we can both tick off from our phones.
@@ -63,6 +70,8 @@ See [`docs/SPEC.md`](docs/SPEC.md) for the full data model, pipeline, and roadma
 Next.js (App Router, TypeScript), Tailwind · Supabase (Postgres + RLS, Auth, Realtime, Edge Functions on Deno) · Leaflet + OpenStreetMap tiles · Vercel · Vitest and Deno test.
 
 ## Running it yourself
+
+My hosted instance is private (sign-ups are closed), so to try it, run your own copy. It takes a free Supabase project and about 15 minutes.
 
 You'll need Node 20+, a [Supabase](https://supabase.com) project, and optionally a free [Ticketmaster Discovery API](https://developer.ticketmaster.com) key for events. Docker isn't required; everything below targets a hosted Supabase project.
 
