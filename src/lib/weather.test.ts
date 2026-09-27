@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeAlerts,
   asWeatherSummary,
   formatClock,
   formatSpan,
@@ -93,5 +94,45 @@ describe("weatherBadge", () => {
         },
       }),
     ).toEqual({ text: "🌨️ Snow 2–9 PM", level: "warn" });
+  });
+});
+
+describe("activeAlerts", () => {
+  const alert = (ends: string | null) => ({
+    id: ends ?? "open",
+    event: "Wind Advisory",
+    severity: "Moderate" as const,
+    headline: null,
+    starts: null,
+    ends,
+    instruction: null,
+  });
+  const now = Date.parse("2026-10-03T12:00:00-06:00");
+
+  it("drops alerts that have ended, keeps open-ended ones", () => {
+    const alerts = [
+      alert("2026-10-03T08:00:00-06:00"),
+      alert("2026-10-03T20:00:00-06:00"),
+      alert(null),
+    ];
+    expect(activeAlerts(alerts, now).map((a) => a.id)).toEqual([
+      "2026-10-03T20:00:00-06:00",
+      "open",
+    ]);
+  });
+
+  it("keeps everything while the clock is unknown (SSR)", () => {
+    expect(
+      activeAlerts([alert("2026-10-03T08:00:00-06:00")], null),
+    ).toHaveLength(1);
+    expect(activeAlerts(undefined, now)).toEqual([]);
+  });
+
+  it("an expired alert no longer drives the badge", () => {
+    const s: WeatherSummary = {
+      ...base,
+      alerts: [alert("2026-10-03T08:00:00-06:00")],
+    };
+    expect(weatherBadge(s, now)).toBeNull();
   });
 });

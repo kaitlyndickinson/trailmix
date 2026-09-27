@@ -4,13 +4,12 @@ import { fetchJson } from "./http.ts";
 
 const ENDPOINT = "https://api.open-meteo.com/v1/forecast";
 
-export type OpenMeteoResponse = OpenMeteoForecast;
 
 /** Daily + hourly forecast for one date, in the trailhead's local timezone. */
 export async function fetchForecast(
   at: LatLng,
   isoDate: string,
-): Promise<OpenMeteoResponse> {
+): Promise<OpenMeteoForecast> {
   const params = new URLSearchParams({
     latitude: String(at.lat),
     longitude: String(at.lng),
@@ -53,5 +52,5 @@ export async function fetchForecast(
       "is_day",
     ].join(","),
   });
-  return (await fetchJson("open-meteo", `${ENDPOINT}?${params}`)) as OpenMeteoResponse;
+  return (await fetchJson("open-meteo", `${ENDPOINT}?${params}`)) as OpenMeteoForecast;
 }

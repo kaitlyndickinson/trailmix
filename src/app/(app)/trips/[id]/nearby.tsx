@@ -60,6 +60,7 @@ const SOURCE_LABELS: Record<string, string> = {
   overpass: "places",
   ticketmaster: "events",
   open_meteo: "weather",
+  nws: "weather alerts",
 };
 
 export function Nearby({

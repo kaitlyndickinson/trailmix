@@ -9,9 +9,14 @@ export function daysUntil(tripDate: string, today: string): number {
   return Math.round((toUtc(tripDate) - toUtc(today)) / 86_400_000);
 }
 
+/**
+ * Whether a trip date can be forecast. `today` is a UTC date, so one day of
+ * slack keeps "today at the trailhead" in range when UTC has already rolled
+ * over (e.g. a Colorado evening).
+ */
 export function isInForecastWindow(tripDate: string, today: string): boolean {
   const days = daysUntil(tripDate, today);
-  return days >= 0 && days < FORECAST_WINDOW_DAYS;
+  return days >= -1 && days < FORECAST_WINDOW_DAYS;
 }
 
 // WMO weather codes used by Open-Meteo.
@@ -49,46 +54,4 @@ const WEATHER_CODES: Record<number, string> = {
 export function describeWeatherCode(code: number | null | undefined): string | null {
   if (code == null) return null;
   return WEATHER_CODES[code] ?? null;
-}
-
-type OpenMeteoDaily = {
-  time?: string[];
-  temperature_2m_max?: (number | null)[];
-  temperature_2m_min?: (number | null)[];
-  precipitation_probability_max?: (number | null)[];
-  weather_code?: (number | null)[];
-  sunrise?: string[];
-  sunset?: string[];
-};
-
-export type WeatherSummary = {
-  date: string;
-  conditions: string | null;
-  high_f: number | null;
-  low_f: number | null;
-  precip_max_pct: number | null;
-  sunrise: string | null; // local "HH:MM"
-  sunset: string | null;
-};
-
-/** Pulls the trip date's row out of Open-Meteo's daily arrays. */
-export function summarizeWeather(
-  daily: OpenMeteoDaily,
-  tripDate: string,
-): WeatherSummary | null {
-  const i = daily.time?.indexOf(tripDate) ?? -1;
-  if (i < 0) return null;
-  const at = <T>(arr: (T | null)[] | undefined) => arr?.[i] ?? null;
-  const time = (iso: string | null) => (iso ? iso.slice(11, 16) : null);
-  const round = (n: number | null) => (n == null ? null : Math.round(n));
-
-  return {
-    date: tripDate,
-    conditions: describeWeatherCode(at(daily.weather_code)),
-    high_f: round(at(daily.temperature_2m_max)),
-    low_f: round(at(daily.temperature_2m_min)),
-    precip_max_pct: at(daily.precipitation_probability_max),
-    sunrise: time(daily.sunrise?.[i] ?? null),
-    sunset: time(daily.sunset?.[i] ?? null),
-  };
 }
