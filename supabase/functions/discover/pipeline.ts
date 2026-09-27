@@ -2,7 +2,6 @@
 // from the pure modules in _shared/discovery; this file only does I/O.
 
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { fetchForecast } from "../_shared/clients/open-meteo.ts";
 import { fetchOverpass } from "../_shared/clients/overpass.ts";
 import { fetchEvents } from "../_shared/clients/ticketmaster.ts";
 import { dedupePlaces } from "../_shared/discovery/dedupe.ts";
@@ -22,11 +21,7 @@ import {
   topPerCategory,
 } from "../_shared/discovery/select.ts";
 import type { Category, EventInput, LatLng } from "../_shared/discovery/types.ts";
-import {
-  daysUntil,
-  FORECAST_WINDOW_DAYS,
-  summarizeWeather,
-} from "../_shared/discovery/weather.ts";
+import { refreshWeather } from "./weather.ts";
 
 export type TripForDiscovery = {
   id: string;
@@ -55,7 +50,6 @@ export type RunResult = {
 
 const OVERPASS_CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 const PAGE = 1000;
-const KEEP_WEATHER_SNAPSHOTS = 3;
 
 type PlaceRow = {
   id: string;
@@ -217,10 +211,6 @@ export async function runDiscovery(
     const radiusM = trip.discovery_radius_m;
     const tripDate = trip.trip_date;
     const tmKey = Deno.env.get("TICKETMASTER_API_KEY");
-    const utcToday = new Date().toISOString().slice(0, 10);
-    // -1 allows for "today" at the trailhead still being yesterday in UTC terms.
-    const days = tripDate ? daysUntil(tripDate, utcToday) : null;
-    const wantWeather = days != null && days >= -1 && days < FORECAST_WINDOW_DAYS;
 
     // 2. Fetch in parallel; one failing source makes the run partial.
     const [placesResult, eventsResult, weatherResult] = await Promise.allSettled([
@@ -228,7 +218,7 @@ export async function runDiscovery(
       tripDate && tmKey
         ? timed(() => loadEvents(admin, tmKey, center, radiusM, tripDate))
         : Promise.resolve(null),
-      wantWeather ? timed(() => fetchForecast(center, tripDate!)) : Promise.resolve(null),
+      refreshWeather(admin, trip.id, run.id, center, tripDate),
     ]);
 
     const failures: string[] = [];
@@ -382,40 +372,14 @@ export async function runDiscovery(
       if (error) throw new Error(`recommendations prune: ${error.message}`);
     }
 
-    // 9. Weather snapshot + summary.
+    // 9. Weather snapshot + hiker summary (saved inside refreshWeather).
     if (weatherResult.status === "rejected") {
       stats.open_meteo = { status: "error", error: errorMessage(weatherResult.reason) };
       failures.push("open_meteo");
-    } else if (weatherResult.value === null) {
-      stats.open_meteo = {
-        status: "skipped",
-        note: !tripDate ? "trip has no date" : "outside the 16-day forecast window",
-      };
     } else {
-      const forecast = weatherResult.value.value;
-      const summary = summarizeWeather(forecast.daily ?? {}, tripDate!);
-      const { error } = await admin.from("weather_snapshots").insert({
-        trip_id: trip.id,
-        run_id: run.id,
-        daily: forecast.daily ?? {},
-        hourly: forecast.hourly ?? {},
-        summary: { ...summary, timezone: forecast.timezone ?? null },
-      });
-      if (error) throw new Error(`weather insert: ${error.message}`);
-      stats.open_meteo = { status: "ok", ms: weatherResult.value.ms };
-
-      const { data: old } = await admin
-        .from("weather_snapshots")
-        .select("id")
-        .eq("trip_id", trip.id)
-        .order("fetched_at", { ascending: false })
-        .range(KEEP_WEATHER_SNAPSHOTS, KEEP_WEATHER_SNAPSHOTS + 50);
-      if (old && old.length > 0) {
-        await admin
-          .from("weather_snapshots")
-          .delete()
-          .in("id", old.map((r: { id: string }) => r.id));
-      }
+      Object.assign(stats, weatherResult.value.stats);
+      if (weatherResult.value.failed) failures.push("open_meteo");
+      if (weatherResult.value.stats.nws.status === "error") failures.push("nws");
     }
 
     // 10. Finish.
