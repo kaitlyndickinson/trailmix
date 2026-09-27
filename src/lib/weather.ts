@@ -101,12 +101,28 @@ export function formatSpan(start: string, end: string): string {
   return aSuffix === bSuffix ? `${aNum}–${b}` : `${a}–${b}`;
 }
 
+/**
+ * Alerts still in effect. `nowMs` null (during SSR) keeps them all, so server
+ * and client render the same list until the clock is known.
+ */
+export function activeAlerts(
+  alerts: WeatherAlert[] | undefined,
+  nowMs: number | null,
+): WeatherAlert[] {
+  if (!alerts) return [];
+  if (nowMs == null) return alerts;
+  return alerts.filter((a) => !a.ends || Date.parse(a.ends) > nowMs);
+}
+
 export type WeatherBadge = { text: string; level: "danger" | "warn" };
 
 /** One-line heads-up for lists and headers, or null if the day looks fine. */
-export function weatherBadge(s: WeatherSummary | null): WeatherBadge | null {
+export function weatherBadge(
+  s: WeatherSummary | null,
+  nowMs: number = Date.now(),
+): WeatherBadge | null {
   if (!s) return null;
-  const alert = s.alerts?.[0];
+  const alert = activeAlerts(s.alerts, nowMs)[0];
   if (alert) {
     return {
       text: `⚠️ ${alert.event}`,

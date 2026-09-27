@@ -379,7 +379,8 @@ export async function runDiscovery(
     } else {
       Object.assign(stats, weatherResult.value.stats);
       if (weatherResult.value.failed) failures.push("open_meteo");
-      if (weatherResult.value.stats.nws.status === "error") failures.push("nws");
+      // NWS alerts are best-effort: recorded in stats and shown on the
+      // forecast card, but they don't make the run partial.
     }
 
     // 10. Finish.

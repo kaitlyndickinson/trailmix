@@ -8,14 +8,19 @@ import {
 } from "./weather";
 
 /**
- * Latest forecast heads-up per trip, from each trip's newest weather snapshot.
+ * Latest forecast heads-up per upcoming trip, from its newest weather snapshot.
  * Selects only the JSON fields the badge needs, not the hourly data.
  */
 export async function loadWeatherBadges(
   supabase: SupabaseClient<Database>,
   trips: { id: string; trip_date: string | null }[],
 ): Promise<Map<string, WeatherBadge>> {
-  const dated = trips.filter((t) => t.trip_date);
+  // Skip trips that are over (UTC date minus a day of slack for time zones).
+  const yesterday = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const dated = trips.filter((t) => t.trip_date && t.trip_date >= yesterday);
+  const dateById = new Map(dated.map((t) => [t.id, t.trip_date]));
   const badges = new Map<string, WeatherBadge>();
   if (dated.length === 0) return badges;
 
@@ -34,10 +39,9 @@ export async function loadWeatherBadges(
   for (const row of data ?? []) {
     if (seen.has(row.trip_id)) continue; // newest first; keep one per trip
     seen.add(row.trip_id);
-    const trip = dated.find((t) => t.id === row.trip_id);
     const summary = asWeatherSummary(
       row as unknown as WeatherSummary,
-      trip?.trip_date ?? null,
+      dateById.get(row.trip_id) ?? null,
     );
     const badge = weatherBadge(summary);
     if (badge) badges.set(row.trip_id, badge);

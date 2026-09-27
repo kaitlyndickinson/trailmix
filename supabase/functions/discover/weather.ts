@@ -8,7 +8,7 @@ import { fetchForecast } from "../_shared/clients/open-meteo.ts";
 import { alertsForDay } from "../_shared/discovery/alerts.ts";
 import { buildDaySummary } from "../_shared/discovery/hiking-weather.ts";
 import type { LatLng } from "../_shared/discovery/types.ts";
-import { daysUntil, FORECAST_WINDOW_DAYS } from "../_shared/discovery/weather.ts";
+import { isInForecastWindow } from "../_shared/discovery/weather.ts";
 
 const KEEP_WEATHER_SNAPSHOTS = 3;
 
@@ -27,10 +27,8 @@ function errorMessage(err: unknown): string {
 
 /** Whether the trip date is inside the forecast window. */
 export function wantsWeather(tripDate: string | null): boolean {
-  if (!tripDate) return false;
-  // -1 allows for "today" at the trailhead still being yesterday in UTC.
-  const days = daysUntil(tripDate, new Date().toISOString().slice(0, 10));
-  return days >= -1 && days < FORECAST_WINDOW_DAYS;
+  return tripDate != null &&
+    isInForecastWindow(tripDate, new Date().toISOString().slice(0, 10));
 }
 
 /**
@@ -61,13 +59,15 @@ export async function refreshWeather(
   ]);
   const ms = Date.now() - started;
 
+  const nwsStat: SourceStat = alertsResult.status === "fulfilled"
+    ? { status: "ok", ms }
+    : { status: "error", error: errorMessage(alertsResult.reason), ms };
+
   if (forecastResult.status === "rejected") {
     return {
       stats: {
         open_meteo: { status: "error", error: errorMessage(forecastResult.reason), ms },
-        nws: alertsResult.status === "fulfilled"
-          ? { status: "ok", ms }
-          : { status: "error", error: errorMessage(alertsResult.reason), ms },
+        nws: nwsStat,
       },
       failed: true,
       summary: null,
@@ -76,13 +76,23 @@ export async function refreshWeather(
 
   const forecast = forecastResult.value;
   const day = buildDaySummary(forecast, tripDate);
-  const alertsOk = alertsResult.status === "fulfilled";
-  const summary = day && {
+  if (!day) {
+    // Nothing useful to store; don't replace a good snapshot with an empty one.
+    return {
+      stats: {
+        open_meteo: { status: "error", error: `forecast has no data for ${tripDate}`, ms },
+        nws: nwsStat,
+      },
+      failed: true,
+      summary: null,
+    };
+  }
+  const summary = {
     ...day,
-    alerts: alertsOk
+    alerts: alertsResult.status === "fulfilled"
       ? alertsForDay(alertsResult.value, tripDate, forecast.utc_offset_seconds ?? 0)
       : [],
-    alerts_unavailable: !alertsOk,
+    alerts_unavailable: alertsResult.status !== "fulfilled",
   };
 
   const { error } = await admin.from("weather_snapshots").insert({
@@ -90,7 +100,7 @@ export async function refreshWeather(
     run_id: runId,
     daily: forecast.daily ?? {},
     hourly: forecast.hourly ?? {},
-    summary: summary ?? {},
+    summary,
   });
   if (error) throw new Error(`weather insert: ${error.message}`);
 
@@ -108,12 +118,7 @@ export async function refreshWeather(
   }
 
   return {
-    stats: {
-      open_meteo: { status: "ok", ms },
-      nws: alertsOk
-        ? { status: "ok", ms }
-        : { status: "error", error: errorMessage(alertsResult.reason), ms },
-    },
+    stats: { open_meteo: { status: "ok", ms }, nws: nwsStat },
     failed: false,
     summary,
   };

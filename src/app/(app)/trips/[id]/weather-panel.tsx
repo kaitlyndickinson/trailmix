@@ -1,12 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { localToday } from "@/lib/trip-fields";
 import { timeAgo, useNow } from "@/lib/use-now";
 import {
+  activeAlerts,
   formatClock,
   formatSpan,
   type HourPoint,
@@ -17,9 +25,11 @@ import {
 /** Forecasts older than this refresh automatically for trips today/tomorrow. */
 const AUTO_REFRESH_AFTER_MS = 3 * 60 * 60 * 1000;
 
-function daysFromToday(isoDate: string): number {
+const noopSubscribe = () => () => {};
+
+function daysBetween(today: string, isoDate: string): number {
   const [y, m, d] = isoDate.split("-").map(Number);
-  const [ty, tm, td] = localToday().split("-").map(Number);
+  const [ty, tm, td] = today.split("-").map(Number);
   return Math.round(
     (Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86_400_000,
   );
@@ -43,7 +53,10 @@ export function WeatherPanel({
   const [error, setError] = useState<string | null>(null);
   const autoTried = useRef(false);
 
-  const days = tripDate ? daysFromToday(tripDate) : null;
+  // The device's local date; null during SSR and hydration so the server
+  // (UTC) and the phone never disagree about which day it is.
+  const today = useSyncExternalStore(noopSubscribe, localToday, () => null);
+  const days = tripDate && today ? daysBetween(today, tripDate) : null;
   const inWindow = days != null && days >= 0 && days < 16;
 
   async function update() {
@@ -78,17 +91,22 @@ export function WeatherPanel({
     void update();
   });
   useEffect(() => {
+    if (today == null) return; // wait until the local date is known
     // Deferred so it runs after mount (and survives React's dev double-run).
     const id = setTimeout(refreshIfStale, 0);
     return () => clearTimeout(id);
-  }, []);
+  }, [today]);
 
   if (!tripDate) {
     return <Note>Add a date to see the forecast.</Note>;
   }
-  if (!inWindow) {
+  if (today == null && !weather) {
+    return <Note>Loading the forecast…</Note>;
+  }
+  if (today != null && !inWindow) {
     return <Note>The forecast shows up once the trip is within 16 days.</Note>;
   }
+  const alerts = activeAlerts(weather?.alerts, now);
 
   const updatedLabel = updating
     ? "Updating…"
@@ -133,9 +151,7 @@ export function WeatherPanel({
       ) : (
         <>
           <Overview weather={weather} />
-          {weather.alerts && weather.alerts.length > 0 && (
-            <Alerts alerts={weather.alerts} />
-          )}
+          {alerts.length > 0 && <Alerts alerts={alerts} />}
           {weather.alerts_unavailable && (
             <p className="text-foreground/50 text-xs">
               Couldn&apos;t check National Weather Service alerts this time.
