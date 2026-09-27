@@ -1,6 +1,6 @@
-# Trailmix
+# trailmix
 
-A small, mobile-first web app for planning hikes with a partner. Save a trail, pick a date, share a checklist, and see what's open and happening near the trailhead that day: breweries, food, viewpoints, events, and the forecast.
+A small, mobile-first web app for planning hikes with your crew. Save a trail, pick a date, share a checklist, and see what's open and happening near the trailhead that day: breweries, food, viewpoints, events, and the forecast.
 
 <p align="center">
   <img src="docs/screenshots/trips.png" alt="Trips list grouped into Upcoming, Someday, and Done" width="250">
@@ -11,48 +11,19 @@ A small, mobile-first web app for planning hikes with a partner. Save a trail, p
 
 ## Why this exists
 
-AllTrails is great for finding trails and recording hikes. The annoying part is everything around it: finding the trail, then separately digging around for a brewery that's open after, an event in town that evening, and whether afternoon storms are coming. Trailmix does that second part and keeps a checklist we can both tick off from our phones.
+AllTrails is great for finding trails and recording hikes. The annoying part is everything around it: finding the trail, then separately digging around for a brewery that's open after, an event in town that evening, and whether afternoon storms are coming. trailmix handles that second part, plus a shared checklist everyone can tick off from their own phone.
 
 It deliberately doesn't do GPS tracking, trail search, or social features. Recommendations are **deterministic and explainable**: every suggestion says why it's there ("0.8 mi from trailhead", "Open 11:00–21:00 Sat", "Event at 7:30 PM on your hike day"). No LLM decides what's on the list.
 
 ## Features
 
-- **Crews:** a shared space for two (or more) people. Invite with a single-use code or link; trips and checklists are shared automatically.
+- **Crews:** a shared space for your hiking group, any size. Invite with a single-use code or link; trips and checklists are shared automatically.
 - **Trips:** trail name, AllTrails link, date (or "someday"), and a trailhead pin. Find the trailhead by name search, by pasting coordinates or a Google/Apple Maps link (share links included), by tapping the map, or with your current location.
-- **Checklists (optional):** start from a reusable template like "Day hike", or add items as you go. Check items off on either phone and it syncs live, showing who checked what.
-- **Nearby:** the day's forecast plus ranked places and events near the trailhead, grouped by category, within 5–25 mi. Pin favorites, dismiss the rest; both stick across refreshes.
+- **Checklists (optional):** start from a reusable template like "Day hike", or add items as you go. Check items off on any phone and it syncs live, showing who checked what.
+- **Nearby:** the day's forecast plus ranked places and events near the trailhead, grouped by category, within 5–25 mi. Pin favorites to the top, dismiss the rest; both stick across refreshes.
 - **Installable:** add it to your home screen as a PWA.
 
 ## How it works
-
-```mermaid
-flowchart LR
-  subgraph Phone["Phone (PWA)"]
-    UI[Next.js app]
-  end
-  subgraph Vercel
-    SSR[Server components<br/>and server actions]
-  end
-  subgraph Supabase
-    Auth[Auth]
-    DB[(Postgres + RLS)]
-    RT[Realtime]
-    FN[discover<br/>Edge Function]
-  end
-  OSM[(Overpass mirrors<br/>OpenStreetMap)]
-  OM[(Open-Meteo)]
-  TM[(Ticketmaster)]
-  PH[(Photon geocoder)]
-
-  UI --> SSR
-  UI -- checklist sync --> RT
-  UI -- Refresh --> FN
-  SSR --> DB
-  SSR -- trailhead search --> PH
-  FN --> OSM & OM & TM
-  FN -- cache + results --> DB
-  Auth --> DB
-```
 
 - **Sharing is enforced in the database.** Every table has row-level security keyed on crew membership (`is_crew_member()`), with SQL tests proving a non-member can't read or change another crew's trips.
 - **Discovery runs in one Edge Function.** It fetches OpenStreetMap places, events, and the forecast in parallel. One source failing makes the run *partial*, not failed. Places are a shared cache (7 days per area), results are deduplicated (same name within 75 m), checked against opening hours on the trip date, and scored:
@@ -71,7 +42,7 @@ Next.js (App Router, TypeScript), Tailwind · Supabase (Postgres + RLS, Auth, Re
 
 ## Running it yourself
 
-My hosted instance is private (sign-ups are closed), so to try it, run your own copy. It takes a free Supabase project and about 15 minutes.
+There's no public demo (sign-ups are closed on the hosted instance), so to try it, run your own copy. It takes a free Supabase project and about 15 minutes.
 
 You'll need Node 20+, a [Supabase](https://supabase.com) project, and optionally a free [Ticketmaster Discovery API](https://developer.ticketmaster.com) key for events. Docker isn't required; everything below targets a hosted Supabase project.
 

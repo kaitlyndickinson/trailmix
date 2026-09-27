@@ -7,7 +7,7 @@ const RETRY_BACKOFF_MS = 1_000;
 
 export function userAgent(): string {
   const contact = process.env.OSM_CONTACT_EMAIL ?? "unset";
-  return `Trailmix/0.1 (hike planner; contact: ${contact})`;
+  return `trailmix/0.1 (hike planner; contact: ${contact})`;
 }
 
 export async function fetchWithRetry(
