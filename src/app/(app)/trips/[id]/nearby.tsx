@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { timeAgo, useNow } from "@/lib/use-now";
 import { directionsUrl } from "@/lib/trip-fields";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/ui";
+import type { WeatherSummary } from "@/lib/weather";
+import { WeatherPanel } from "./weather-panel";
 
 export type Recommendation = {
   item_type: string;
@@ -21,16 +23,6 @@ export type Recommendation = {
   url: string | null;
   lat: number | null;
   lng: number | null;
-};
-
-export type WeatherSummary = {
-  date: string;
-  conditions: string | null;
-  high_f: number | null;
-  low_f: number | null;
-  precip_max_pct: number | null;
-  sunrise: string | null;
-  sunset: string | null;
 };
 
 export type LastRun = {
@@ -73,18 +65,20 @@ const SOURCE_LABELS: Record<string, string> = {
 export function Nearby({
   tripId,
   hasPin,
-  hasDate,
+  tripDate,
   radiusM,
   initialRecommendations,
   weather,
+  weatherFetchedAt,
   lastRun,
 }: {
   tripId: string;
   hasPin: boolean;
-  hasDate: boolean;
+  tripDate: string | null;
   radiusM: number;
   initialRecommendations: Recommendation[];
   weather: WeatherSummary | null;
+  weatherFetchedAt: string | null;
   lastRun: LastRun | null;
 }) {
   const router = useRouter();
@@ -284,7 +278,12 @@ export function Nearby({
         </div>
       )}
 
-      <WeatherCard weather={weather} hasDate={hasDate} />
+      <WeatherPanel
+        tripId={tripId}
+        tripDate={tripDate}
+        weather={weather}
+        fetchedAt={weatherFetchedAt}
+      />
 
       {groups.length === 0 && !refreshing && (
         <div className="border-forest/30 text-foreground/60 rounded-2xl border border-dashed p-6 text-center">
@@ -331,61 +330,6 @@ export function Nearby({
       )}
     </div>
   );
-}
-
-function WeatherCard({
-  weather,
-  hasDate,
-}: {
-  weather: WeatherSummary | null;
-  hasDate: boolean;
-}) {
-  if (!weather) {
-    return (
-      <div className="bg-sand/60 text-foreground/70 rounded-2xl p-4 text-sm">
-        {hasDate
-          ? "Weather shows up once the trip is within 16 days."
-          : "Add a date to see the forecast."}
-      </div>
-    );
-  }
-  return (
-    <div className="bg-forest rounded-2xl p-4 text-white">
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-sm text-white/70">Forecast</p>
-          <p className="text-lg font-semibold">{weather.conditions ?? "—"}</p>
-        </div>
-        <p className="text-3xl font-semibold">
-          {weather.high_f ?? "–"}°
-          <span className="text-lg text-white/60">
-            {" "}
-            / {weather.low_f ?? "–"}°
-          </span>
-        </p>
-      </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-        <div>
-          <dt className="text-white/60">Rain</dt>
-          <dd className="font-medium">{weather.precip_max_pct ?? "–"}%</dd>
-        </div>
-        <div>
-          <dt className="text-white/60">Sunrise</dt>
-          <dd className="font-medium">{formatClock(weather.sunrise)}</dd>
-        </div>
-        <div>
-          <dt className="text-white/60">Sunset</dt>
-          <dd className="font-medium">{formatClock(weather.sunset)}</dd>
-        </div>
-      </dl>
-    </div>
-  );
-}
-
-function formatClock(hhmm: string | null): string {
-  if (!hhmm) return "–";
-  const [h, m] = hhmm.split(":").map(Number);
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
 function categoryTag(category: string): string {
