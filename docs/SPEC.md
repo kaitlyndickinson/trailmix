@@ -272,7 +272,7 @@ Each phase ends in something deployed and usable.
 - [ ] Custom SMTP, then switch auth to email OTP (`{{ .Token }}` template + `verifyOtp`)
 
 ### Phase 5: Portfolio-ready
-- [ ] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps (done except the screenshot)
+- [x] README with a screenshot, an architecture diagram (Mermaid), a "why this exists" section, and setup steps
 - [ ] `docs/decisions/` with short ADRs (OTP vs magic link, crews vs per-trip sharing, deterministic ranking, shared place cache)
 - [ ] GitHub Actions: lint, typecheck, Vitest, Deno test
 - [ ] Seed script and `.env.example` (`.env.example` done)
