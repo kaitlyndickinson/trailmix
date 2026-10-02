@@ -22,6 +22,12 @@ export function AuthForm({
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="next" value={next} />
       {mode === "signup" && (
+        <p className="bg-sand/60 text-foreground/70 rounded-lg p-3 text-sm">
+          trailmix is invite-only. Sign up with the email address you were
+          invited with.
+        </p>
+      )}
+      {mode === "signup" && (
         <div>
           <label htmlFor="display_name" className={labelClass}>
             Your name

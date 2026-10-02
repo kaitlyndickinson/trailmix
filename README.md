@@ -70,6 +70,17 @@ You'll need Node 20+, a [Supabase](https://supabase.com) project, and optionally
 
 To deploy, import the repo in Vercel and set the same variables as in `.env.example`.
 
+### Invite-only sign-ups (optional)
+
+Without this, anyone who finds your URL can create an account. The migrations include an email allowlist and a database function for Supabase's "before user created" auth hook:
+
+1. Add the emails that may sign up (Supabase SQL editor):
+   ```sql
+   insert into public.signup_allowlist (email, note) values ('you@example.com', 'me');
+   ```
+2. **Authentication → Hooks → Before User Created** → enable → Postgres → `public.hook_before_user_created`.
+3. Leave **Allow new users to sign up** on. Emails not on the list are turned away with an "invite-only" message.
+
 ## Tests
 
 ```bash
@@ -77,6 +88,7 @@ npm test                   # Vitest: app-side helpers (e.g. Maps link parsing)
 npm run test:functions     # Deno: discovery logic (needs Deno, or: npx deno test supabase/functions)
 npx supabase db query --linked -f supabase/tests/rls_phase1.sql   # RLS checks (rolled back)
 npx supabase db query --linked -f supabase/tests/rls_phase2.sql
+npx supabase db query --linked -f supabase/tests/signup_allowlist.sql
 ```
 
 `supabase/functions/_dev/smoke-sources.ts` runs the real place and weather sources for a coordinate, without touching the database.

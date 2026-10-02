@@ -150,6 +150,7 @@ trip_recommendation_details   -- view (security_invoker) joining recommendations
 - Create a `security definer` helper `is_crew_member(crew_id uuid) returns bool`. This avoids recursive policies on `crew_members`.
 - `trips` and `checklist_*` are readable and writable when `is_crew_member(<the trip's crew_id>)`. `trip_recommendations`, `weather_snapshots`, and `discovery_runs` are readable by members; only the Edge Function writes them, except that members can update `pinned` and `dismissed`.
 - `places` and `events` are readable by any authenticated user. Only the service role writes to them (from the Edge Function).
+- Sign-ups are invite-only: Supabase Auth's "before user created" hook calls `hook_before_user_created(event)`, which allows only emails in `signup_allowlist` (lowercase, RLS on with no policies or API grants; executable only by `supabase_auth_admin`). Emails are added with SQL, never in migrations, since the repo is public.
 - Invites are redeemed through an RPC, `redeem_crew_invite(code)`, that validates the code and inserts into `crew_members`. Codes are single-use and expire after 7 days. Redeeming also deletes the redeemer's own auto-created crew if it's untouched (no other members, no trips), so each person normally belongs to exactly one crew.
 - On signup, a trigger creates the user's `profiles` row and a default crew.
 
@@ -274,6 +275,7 @@ Each phase ends in something deployed and usable.
 - [ ] Map tab
 - [ ] "What changed since last refresh" (new event added, place now closed)
 - [ ] Offline-friendly checklist (cached shell, optimistic updates)
+- [x] Invite-only sign-ups: email allowlist + "before user created" auth hook
 - [ ] Custom SMTP, then switch auth to email OTP (`{{ .Token }}` template + `verifyOtp`)
 
 ### Phase 5: Portfolio-ready
