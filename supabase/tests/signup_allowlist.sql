@@ -1,43 +1,46 @@
--- Signup allowlist + before-user-created hook. Same harness as the RLS tests:
+-- Invite-only sign-ups: the enforce_signup_allowlist trigger on auth.users.
+-- Same harness as the RLS tests:
 --   npx supabase db query --linked -f supabase/tests/signup_allowlist.sql
 -- Runs in one transaction and rolls back.
 
 begin;
 
 insert into public.signup_allowlist (email, note)
-values ('allowed-test@example.com', 'test')
-on conflict (email) do nothing;
+values ('allowed-test@example.com', 'test');
 
 do $$
-declare
-  ev  jsonb;
-  res jsonb;
 begin
-  -- Allowed email passes (case and surrounding spaces don't matter).
-  foreach ev in array array[
-    '{"user": {"email": "allowed-test@example.com"}}'::jsonb,
-    '{"user": {"email": "  Allowed-Test@Example.COM "}}'::jsonb
-  ] loop
-    res := public.hook_before_user_created(ev);
-    if res <> '{}'::jsonb then
-      raise exception 'FAIL: allowlisted email was rejected: %', res;
-    end if;
-  end loop;
-
-  -- Anyone else is rejected with a 403 and a readable message.
-  res := public.hook_before_user_created('{"user": {"email": "stranger@example.com"}}');
-  if (res -> 'error' ->> 'http_code')::int <> 403
-     or res -> 'error' ->> 'message' not like '%invite-only%' then
-    raise exception 'FAIL: non-allowlisted email was not rejected: %', res;
+  -- A listed email can be created (case and spaces don't matter), and the
+  -- signup trigger still gives it a profile and crew.
+  insert into auth.users (id, email, aud, role)
+  values ('00000000-0000-4000-8000-0000000000e1', '  Allowed-Test@Example.COM ',
+          'authenticated', 'authenticated');
+  if not exists (select 1 from public.profiles
+                 where id = '00000000-0000-4000-8000-0000000000e1') then
+    raise exception 'FAIL: allowlisted user did not get a profile';
   end if;
 
-  -- No email at all (e.g. phone sign-up) is rejected too.
-  res := public.hook_before_user_created('{"user": {"phone": "+15555550100"}}');
-  if res -> 'error' is null then
-    raise exception 'FAIL: sign-up without an email was allowed';
-  end if;
+  -- Anyone else is rejected before the row is written.
+  begin
+    insert into auth.users (id, email, aud, role)
+    values ('00000000-0000-4000-8000-0000000000e2', 'stranger@example.com',
+            'authenticated', 'authenticated');
+    raise exception 'FAIL: non-allowlisted email was accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'trailmix is invite-only' then raise; end if;
+  end;
 
-  -- The table rejects badly formatted emails.
+  -- No email at all (e.g. phone or anonymous sign-up) is rejected too.
+  begin
+    insert into auth.users (id, phone, aud, role)
+    values ('00000000-0000-4000-8000-0000000000e3', '15555550100',
+            'authenticated', 'authenticated');
+    raise exception 'FAIL: sign-up without an email was accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'trailmix is invite-only' then raise; end if;
+  end;
+
+  -- The list only stores normalized emails.
   begin
     insert into public.signup_allowlist (email) values ('Not-Lowercase@Example.com');
     raise exception 'FAIL: mixed-case email was stored';
@@ -46,10 +49,10 @@ begin
 end $$;
 
 ------------------------------------------------------------------------
--- API roles can neither read the list nor call the hook
+-- API roles can't read or change the list
 ------------------------------------------------------------------------
 select set_config('request.jwt.claims',
-  '{"sub": "00000000-0000-4000-8000-00000000000a", "role": "authenticated"}', true);
+  '{"sub": "00000000-0000-4000-8000-0000000000e1", "role": "authenticated"}', true);
 set local role authenticated;
 
 do $$
@@ -57,11 +60,6 @@ begin
   begin
     perform 1 from public.signup_allowlist;
     raise exception 'FAIL: authenticated can read the allowlist';
-  exception when insufficient_privilege then null;
-  end;
-  begin
-    perform public.hook_before_user_created('{"user": {"email": "x@example.com"}}');
-    raise exception 'FAIL: authenticated can call the hook';
   exception when insufficient_privilege then null;
   end;
   begin
@@ -82,23 +80,9 @@ begin
     raise exception 'FAIL: anon can read the allowlist';
   exception when insufficient_privilege then null;
   end;
-  begin
-    perform public.hook_before_user_created('{"user": {"email": "x@example.com"}}');
-    raise exception 'FAIL: anon can call the hook';
-  exception when insufficient_privilege then null;
-  end;
 end $$;
 
 reset role;
-
--- Supabase Auth runs the hook as supabase_auth_admin.
-do $$
-begin
-  if not has_function_privilege('supabase_auth_admin',
-       'public.hook_before_user_created(jsonb)', 'execute') then
-    raise exception 'FAIL: supabase_auth_admin cannot execute the hook';
-  end if;
-end $$;
 
 select 'PASS: all signup allowlist checks' as result;
 

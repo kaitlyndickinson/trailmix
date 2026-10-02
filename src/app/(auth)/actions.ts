@@ -6,6 +6,9 @@ import { safeNext } from "@/lib/safe-next";
 
 export type AuthState = { error?: string };
 
+const INVITE_ONLY_MESSAGE =
+  "trailmix is invite-only. Sign up with the email you were invited with, or ask them to add it.";
+
 export async function signIn(
   _prev: AuthState,
   formData: FormData,
@@ -41,7 +44,17 @@ export async function signUp(
     password,
     options: { data: { display_name: displayName.slice(0, 60) } },
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // The database rejects emails that aren't on the signup allowlist
+    // (enforce_signup_allowlist); Supabase Auth reports that generically.
+    if (/database error saving new user/i.test(error.message)) {
+      return { error: INVITE_ONLY_MESSAGE };
+    }
+    if (/signups? not allowed/i.test(error.message)) {
+      return { error: "Sign-ups are closed right now." };
+    }
+    return { error: error.message };
+  }
   if (!data.session) {
     // Happens if "Confirm email" is still on in the Supabase dashboard.
     return {
