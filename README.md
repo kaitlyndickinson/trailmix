@@ -70,16 +70,15 @@ You'll need Node 20+, a [Supabase](https://supabase.com) project, and optionally
 
 To deploy, import the repo in Vercel and set the same variables as in `.env.example`.
 
-### Invite-only sign-ups (optional)
+### Invite-only sign-ups
 
-Without this, anyone who finds your URL can create an account. The migrations include an email allowlist and a database function for Supabase's "before user created" auth hook:
+Sign-ups are invite-only: a database trigger rejects any new account whose email isn't on `signup_allowlist`, and the sign-up form shows an "invite-only" message. Before anyone (including you) can sign up, add their email in the Supabase SQL editor:
 
-1. Add the emails that may sign up (Supabase SQL editor):
-   ```sql
-   insert into public.signup_allowlist (email, note) values ('you@example.com', 'me');
-   ```
-2. **Authentication → Hooks → Before User Created** → enable → Postgres → `public.hook_before_user_created`.
-3. Leave **Allow new users to sign up** on. Emails not on the list are turned away with an "invite-only" message.
+```sql
+insert into public.signup_allowlist (email, note) values ('you@example.com', 'me');
+```
+
+Keep **Allow new users to sign up** on in Supabase Auth settings; the allowlist does the gatekeeping.
 
 ## Tests
 
