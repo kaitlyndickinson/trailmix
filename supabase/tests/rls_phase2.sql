@@ -4,6 +4,10 @@
 
 begin;
 
+-- Sign-ups are invite-only (enforce_signup_allowlist), so list the test users.
+insert into public.signup_allowlist (email)
+values ('rls-a@test.local'), ('rls-b@test.local');
+
 insert into auth.users (id, email, raw_user_meta_data, aud, role)
 values
   ('00000000-0000-4000-8000-00000000000a', 'rls-a@test.local',
